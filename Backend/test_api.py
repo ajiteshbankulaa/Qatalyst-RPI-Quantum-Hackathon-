@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+sys.path.append(str(Path(__file__).resolve().parent))
+
+from app.main import app  # noqa: E402
+
+
+client = TestClient(app)
+
+
+def _first_scenario_id() -> str:
+    response = client.get("/api/scenarios")
+    response.raise_for_status()
+    scenarios = response.json()
+    assert scenarios
+    return scenarios[0]["id"]
+
+
+def test_scenario_crud():
+    payload = {
+        "name": "Test Wildfire Grid",
+        "domain": "wildfire",
+        "status": "draft",
+        "description": "Test scenario",
+        "grid": [["empty" for _ in range(10)] for _ in range(10)],
+        "metadata_json": {"region": "test"},
+        "constraints_json": {"intervention_budget_k": 5},
+        "objectives_json": {"primary": "minimize exposure"},
+    }
+    created = client.post("/api/scenarios", json=payload)
+    assert created.status_code == 200
+    scenario_id = created.json()["id"]
+
+    updated = client.patch(f"/api/scenarios/{scenario_id}", json={"status": "active"})
+    assert updated.status_code == 200
+    assert updated.json()["version"] >= 2
+
+    deleted = client.delete(f"/api/scenarios/{scenario_id}")
+    assert deleted.status_code == 200
+
+
+def test_core_flow_endpoints():
+    scenario_id = _first_scenario_id()
+
+    risk = client.post("/api/risk/run", json={"scenario_id": scenario_id})
+    assert risk.status_code == 200
+    risk_id = risk.json()["id"]
+
+    forecast = client.post("/api/forecast/run", json={"scenario_id": scenario_id})
+    assert forecast.status_code == 200
+    assert len(forecast.json()["snapshots"]) >= 2
+
+    optimize = client.post("/api/optimize/run", json={"scenario_id": scenario_id})
+    assert optimize.status_code == 200
+    optimize_id = optimize.json()["id"]
+
+    benchmark = client.post("/api/benchmarks/run", json={"scenario_id": scenario_id, "optimization_run_id": optimize_id})
+    assert benchmark.status_code == 200
+    benchmark_id = benchmark.json()["id"]
+    assert benchmark.json()["availability"]["mode"] in {"ready", "degraded"}
+
+    report = client.post(
+        "/api/reports/generate",
+        json={"scenario_id": scenario_id, "risk_run_id": risk_id, "benchmark_run_id": benchmark_id},
+    )
+    assert report.status_code == 200
+    assert report.json()["export"]["format"] == "markdown"
+
+
+def test_integrations_and_overview():
+    integrations = client.get("/api/integrations/status")
+    assert integrations.status_code == 200
+    assert integrations.json()["providers"]
+
+    overview = client.get("/api/overview")
+    assert overview.status_code == 200
+    assert "portfolio" in overview.json()

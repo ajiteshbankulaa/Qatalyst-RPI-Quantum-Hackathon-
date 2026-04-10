@@ -1,183 +1,132 @@
-import { useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, Clock, ChevronDown } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 
-const spreadData = Array.from({ length: 24 }, (_, i) => ({
-  hour: `${i}h`,
-  classical: Math.min(100, 5 + i * 3.2 + Math.random() * 8),
-  hybrid: Math.min(100, 5 + i * 2.5 + Math.random() * 6),
-}));
-
-const metricsOverTime = Array.from({ length: 24 }, (_, i) => ({
-  hour: `${i}h`,
-  affected: Math.round(i * 4.2 + Math.random() * 3),
-  threshold: 60,
-}));
+import { api } from "../api";
+import { EmptyState, LoadingState, MetricTile, PageHeader, ScenarioGrid, SectionPanel, StatusPill } from "../components/product";
+import { useAsyncData } from "../useAsyncData";
 
 export function ForecastPage() {
-  const [timeStep, setTimeStep] = useState(12);
-  const [playing, setPlaying] = useState(false);
-  const [mode, setMode] = useState<"current-projected" | "classical-hybrid">("current-projected");
+  const [params] = useSearchParams();
+  const [scenarioId, setScenarioId] = useState(params.get("scenario") ?? "");
+  const [steps, setSteps] = useState(6);
+  const [dryness, setDryness] = useState(0.78);
+  const [spreadSensitivity, setSpreadSensitivity] = useState(0.64);
+  const [windDirection, setWindDirection] = useState("NE");
+  const [timelineStep, setTimelineStep] = useState(0);
+  const [run, setRun] = useState<any | null>(null);
+  const [running, setRunning] = useState(false);
+  const { data: scenarios, loading, error } = useAsyncData(api.listScenarios, []);
+
+  const selectedScenario = useMemo(() => scenarios?.find((scenario) => scenario.id === scenarioId) ?? scenarios?.[0], [scenarioId, scenarios]);
+  const activeScenarioId = scenarioId || selectedScenario?.id || "";
+  const activeSnapshot = run?.snapshots?.[timelineStep] ?? null;
+
+  async function execute() {
+    if (!activeScenarioId) return;
+    setRunning(true);
+    try {
+      const response = await api.runForecast({
+        scenario_id: activeScenarioId,
+        steps,
+        dryness,
+        spread_sensitivity: spreadSensitivity,
+        wind_direction: windDirection,
+      });
+      setRun(response);
+      setTimelineStep(0);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  if (loading) return <LoadingState label="Loading forecast workspace..." />;
+  if (error || !scenarios) return <EmptyState title="Forecast workspace unavailable" description={error ?? "Could not load scenarios."} />;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 style={{ fontSize: "20px", fontWeight: 600 }}>Propagation Forecast</h1>
-          <p className="text-muted-foreground" style={{ fontSize: "13px" }}>Sierra Nevada — Risk spread simulation over 72h horizon</p>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Forecast"
+        title="Propagation forecast"
+        description="Project wildfire-like spread over discrete steps with explicit dryness, wind, and sensitivity settings. Shift-circuit diagnostics are included as supporting hardware-aware diagnostics, not as a disconnected academic demo."
+        actions={
+          <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white">
+            {running ? "Running..." : "Run forecast"}
+          </button>
+        }
+      />
+
+      <SectionPanel>
+        <div className="grid gap-4 lg:grid-cols-5">
+          <select value={activeScenarioId} onChange={(event) => setScenarioId(event.target.value)} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none">
+            {scenarios.map((scenario) => (
+              <option key={scenario.id} value={scenario.id}>
+                {scenario.name}
+              </option>
+            ))}
+          </select>
+          <input type="number" min={2} max={12} value={steps} onChange={(event) => setSteps(Number(event.target.value))} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none" />
+          <input type="number" step="0.01" min={0} max={1} value={dryness} onChange={(event) => setDryness(Number(event.target.value))} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none" />
+          <input type="number" step="0.01" min={0} max={1} value={spreadSensitivity} onChange={(event) => setSpreadSensitivity(Number(event.target.value))} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none" />
+          <select value={windDirection} onChange={(event) => setWindDirection(event.target.value)} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none">
+            {["N", "S", "E", "W", "NE", "NW", "SE", "SW"].map((direction) => (
+              <option key={direction} value={direction}>
+                Wind {direction}
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 border border-border rounded-lg p-0.5">
-            <button onClick={() => setMode("current-projected")} className={`px-3 py-1 rounded ${mode === "current-projected" ? "bg-muted" : ""}`} style={{ fontSize: "12px" }}>Current vs Projected</button>
-            <button onClick={() => setMode("classical-hybrid")} className={`px-3 py-1 rounded ${mode === "classical-hybrid" ? "bg-muted" : ""}`} style={{ fontSize: "12px" }}>Classical vs Hybrid</button>
-          </div>
-        </div>
-      </div>
+      </SectionPanel>
 
-      {/* Playback controls */}
-      <div className="bg-card rounded-xl border border-border p-4">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
-            <button onClick={() => setTimeStep(0)} className="p-1.5 rounded-lg hover:bg-muted"><SkipBack className="w-4 h-4" /></button>
-            <button onClick={() => setPlaying(!playing)} className="p-2 rounded-lg bg-qp-navy text-white hover:bg-qp-slate">
-              {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            </button>
-            <button onClick={() => setTimeStep(23)} className="p-1.5 rounded-lg hover:bg-muted"><SkipForward className="w-4 h-4" /></button>
-          </div>
-          <div className="flex-1">
-            <input
-              type="range"
-              min={0}
-              max={23}
-              value={timeStep}
-              onChange={(e) => setTimeStep(Number(e.target.value))}
-              className="w-full accent-qp-cyan"
-            />
-            <div className="flex justify-between mt-1">
-              <span className="text-muted-foreground" style={{ fontSize: "10px" }}>0h</span>
-              <span style={{ fontSize: "11px", fontWeight: 500 }}>T = {timeStep}h</span>
-              <span className="text-muted-foreground" style={{ fontSize: "10px" }}>72h</span>
-            </div>
-          </div>
-          <div className="text-right">
-            <p style={{ fontSize: "12px", fontWeight: 500 }}>Hour {timeStep}</p>
-            <p className="text-muted-foreground" style={{ fontSize: "11px" }}>{Math.round(timeStep * 4.2)} cells affected</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Side by side heatmaps */}
-      <div className="grid grid-cols-2 gap-4">
-        {[
-          { label: mode === "current-projected" ? "Current State" : "Classical Forecast", step: 0 },
-          { label: mode === "current-projected" ? `Projected (T+${timeStep}h)` : `Hybrid Forecast (T+${timeStep}h)`, step: timeStep },
-        ].map((panel) => (
-          <div key={panel.label} className="bg-card rounded-xl border border-border p-5">
-            <h3 className="mb-3" style={{ fontSize: "13px", fontWeight: 600 }}>{panel.label}</h3>
-            <div className="grid grid-cols-10 gap-0.5">
-              {Array.from({ length: 100 }).map((_, i) => {
-                const baseRisk = Math.random();
-                const propagated = Math.min(1, baseRisk + (panel.step / 72) * 0.4);
-                const risk = panel.step === 0 ? baseRisk : propagated;
-                const color = risk > 0.8 ? "bg-red-500" : risk > 0.6 ? "bg-orange-400" : risk > 0.35 ? "bg-amber-300" : risk > 0.15 ? "bg-cyan-200" : "bg-slate-100";
-                return <div key={i} className={`aspect-square rounded-[2px] ${color}`} style={{ opacity: 0.3 + risk * 0.7 }} />;
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        {/* Spread corridor chart */}
-        <div className="col-span-2 bg-card rounded-xl border border-border p-5">
-          <h3 className="mb-4" style={{ fontSize: "14px", fontWeight: 600 }}>Spread Area Over Time</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={spreadData}>
-              <defs>
-                <linearGradient id="classicalGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="hybridGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#636882" }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#636882" }} />
-              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid rgba(0,0,0,0.08)" }} />
-              <Area type="monotone" dataKey="classical" stroke="#3b82f6" strokeWidth={2} fill="url(#classicalGrad)" />
-              <Area type="monotone" dataKey="hybrid" stroke="#06b6d4" strokeWidth={2} fill="url(#hybridGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
-          <div className="flex items-center gap-4 mt-2">
-            <span className="flex items-center gap-1" style={{ fontSize: "11px" }}><span className="w-2 h-2 rounded-full bg-blue-500" /> Classical</span>
-            <span className="flex items-center gap-1" style={{ fontSize: "11px" }}><span className="w-2 h-2 rounded-full bg-qp-cyan" /> Hybrid</span>
-          </div>
-        </div>
-
-        {/* Summary metrics */}
-        <div className="space-y-4">
-          <div className="bg-card rounded-xl border border-border p-5">
-            <h3 className="mb-3" style={{ fontSize: "14px", fontWeight: 600 }}>Summary Metrics</h3>
-            <div className="space-y-3">
-              {[
-                { label: "Projected Spread Area", value: `${Math.round(timeStep * 4.2)} cells` },
-                { label: "Affected Nodes", value: `${Math.round(timeStep * 2.8)}` },
-                { label: "Time to Threshold", value: "14.3h" },
-                { label: "Peak Propagation Rate", value: "5.2 cells/h" },
-              ].map((m) => (
-                <div key={m.label} className="flex items-center justify-between">
-                  <span className="text-muted-foreground" style={{ fontSize: "12px" }}>{m.label}</span>
-                  <span style={{ fontSize: "12px", fontWeight: 600 }}>{m.value}</span>
-                </div>
-              ))}
-            </div>
+      {run ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <MetricTile label="Peak ignition" value={String(run.summary.peak_ignited_cells)} hint={`Containment outlook: ${run.summary.containment_outlook}`} />
+            <MetricTile label="Final affected" value={String(run.summary.final_affected_cells)} hint={`Threshold step: ${run.summary.time_to_threshold ?? "not reached"}`} />
+            <MetricTile label="Timeline step" value={String(timelineStep)} hint={`Run ${run.id}`} />
           </div>
 
-          <div className="bg-card rounded-xl border border-border p-5">
-            <h3 className="mb-3" style={{ fontSize: "14px", fontWeight: 600 }}>Model Diagnostics</h3>
-            <div className="space-y-2">
-              {[
-                { label: "Convergence", value: "98.2%" },
-                { label: "Iterations", value: "1,247" },
-                { label: "Residual Error", value: "0.003" },
-              ].map((m) => (
-                <div key={m.label} className="flex items-center justify-between">
-                  <span className="text-muted-foreground" style={{ fontSize: "12px" }}>{m.label}</span>
-                  <span style={{ fontSize: "12px", fontWeight: 500 }}>{m.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-qp-navy/5 border border-qp-navy/10 rounded-xl p-4">
-            <p className="text-muted-foreground" style={{ fontSize: "11px", lineHeight: 1.5 }}>
-              <span style={{ fontWeight: 500, color: "#1a1d2e" }}>Hardware-aware engine:</span> Propagation model accounts for compilation overhead and execution noise when using quantum backends.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Simulation settings */}
-      <div className="bg-card rounded-xl border border-border p-5">
-        <h3 className="mb-4" style={{ fontSize: "14px", fontWeight: 600 }}>Simulation Settings</h3>
-        <div className="grid grid-cols-4 gap-6">
-          {[
-            { label: "Time Horizon", value: "72 hours" },
-            { label: "Time Step", value: "1 hour" },
-            { label: "Propagation Model", value: "Markov Chain" },
-            { label: "Backend", value: "Hybrid (auto)" },
-          ].map((s) => (
-            <div key={s.label}>
-              <span className="text-muted-foreground" style={{ fontSize: "11px" }}>{s.label}</span>
-              <div className="mt-1 px-3 py-1.5 rounded-lg bg-input-background border border-border flex items-center justify-between" style={{ fontSize: "12px" }}>
-                {s.value} <ChevronDown className="w-3 h-3 text-muted-foreground" />
+          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.9fr]">
+            <SectionPanel title="Spread snapshots" subtitle="Timeline-controlled wildfire projection">
+              <ScenarioGrid grid={activeSnapshot?.grid ?? selectedScenario?.grid ?? []} />
+              <input
+                type="range"
+                min={0}
+                max={(run.snapshots?.length ?? 1) - 1}
+                value={timelineStep}
+                onChange={(event) => setTimelineStep(Number(event.target.value))}
+                className="mt-5 w-full"
+              />
+              <div className="mt-3 flex items-center justify-between text-[12px] text-muted-foreground">
+                <span>Step {timelineStep}</span>
+                {activeSnapshot ? <StatusPill label={`${activeSnapshot.metrics.ignited_cells} ignited`} tone="warn" /> : null}
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            </SectionPanel>
+
+            <SectionPanel title="Forecast diagnostics" subtitle="Hardware-aware support metrics for grid-shift logic">
+              <div className="grid gap-3">
+                <div className="rounded-2xl border border-border bg-white/80 p-4">
+                  <p className="text-[13px] font-semibold">Baseline shift circuit</p>
+                  <p className="mt-2 text-[12px] text-muted-foreground">
+                    Depth {run.diagnostics.baseline_shift.depth} • 2Q gates {run.diagnostics.baseline_shift.two_qubit_gate_count}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border bg-white/80 p-4">
+                  <p className="text-[13px] font-semibold">Optimized shift circuit</p>
+                  <p className="mt-2 text-[12px] text-muted-foreground">
+                    Depth {run.diagnostics.optimized_shift.depth} • 2Q gates {run.diagnostics.optimized_shift.two_qubit_gate_count}
+                  </p>
+                </div>
+                <p className="text-[12px] leading-5 text-muted-foreground">{run.diagnostics.summary}</p>
+              </div>
+            </SectionPanel>
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          title="No forecast run yet"
+          description="Run a propagation forecast to inspect snapshot timelines, ignition pressure, and hardware-aware shift diagnostics."
+        />
+      )}
     </div>
   );
 }

@@ -1,172 +1,134 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import {
-  Search, Filter, Grid3X3, List, Plus, Copy, Archive, GitCompare,
-  MoreHorizontal, Flame, Building2, Zap, Truck, Clock, ChevronDown
-} from "lucide-react";
+import { Copy, Plus, Search, Trash2 } from "lucide-react";
 
-const scenarios = [
-  { id: "SC-001", name: "Sierra Nevada Wildfire Grid", domain: "Wildfire", geometry: "10×10 Grid", lastRun: "2h ago", status: "Active", risk: 72, solver: "Hybrid", icon: Flame },
-  { id: "SC-002", name: "Northeast Power Grid Resilience", domain: "Infrastructure", geometry: "Graph (142 nodes)", lastRun: "5h ago", status: "Active", risk: 58, solver: "Classical", icon: Zap },
-  { id: "SC-003", name: "Pacific Coast Supply Chain", domain: "Logistics", geometry: "Graph (89 nodes)", lastRun: "1d ago", status: "Draft", risk: 41, solver: "Quantum", icon: Truck },
-  { id: "SC-004", name: "Urban Infrastructure Network", domain: "Infrastructure", geometry: "Graph (203 nodes)", lastRun: "3d ago", status: "Active", risk: 65, solver: "Hybrid", icon: Building2 },
-  { id: "SC-005", name: "Colorado Front Range Fire Model", domain: "Wildfire", geometry: "10×10 Grid", lastRun: "1w ago", status: "Archived", risk: 34, solver: "Classical", icon: Flame },
-  { id: "SC-006", name: "Midwest Utility Hardening", domain: "Infrastructure", geometry: "Graph (78 nodes)", lastRun: "2d ago", status: "Active", risk: 49, solver: "Quantum", icon: Zap },
-];
-
-const filters = ["All", "Wildfire", "Infrastructure", "Logistics", "Active", "Draft", "Archived"];
+import { api } from "../api";
+import { EmptyState, LoadingState, PageHeader, SectionPanel, StatusPill } from "../components/product";
+import { useAsyncData } from "../useAsyncData";
 
 export function ScenariosPage() {
-  const [viewMode, setViewMode] = useState<"grid" | "table">("table");
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const { data: scenarios, loading, error, reload } = useAsyncData(api.listScenarios, []);
 
-  const filtered = scenarios.filter((s) => {
-    if (activeFilter !== "All" && s.domain !== activeFilter && s.status !== activeFilter) return false;
-    if (search && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = useMemo(() => {
+    if (!scenarios) return [];
+    const lower = query.toLowerCase();
+    return scenarios.filter((scenario) => scenario.name.toLowerCase().includes(lower) || scenario.status.toLowerCase().includes(lower));
+  }, [query, scenarios]);
+
+  async function archiveScenario(id: string) {
+    await api.updateScenario(id, { archived: true, status: "archived" });
+    await reload();
+  }
+
+  async function duplicateScenario(id: string) {
+    const scenario = scenarios?.find((item) => item.id === id);
+    if (!scenario) return;
+    await api.createScenario({
+      name: `${scenario.name} copy`,
+      domain: scenario.domain,
+      status: "draft",
+      description: scenario.description,
+      grid: scenario.grid,
+      metadata_json: scenario.metadata_json,
+      constraints_json: scenario.constraints_json,
+      objectives_json: scenario.objectives_json,
+    });
+    await reload();
+  }
+
+  if (loading) return <LoadingState label="Loading scenarios..." />;
+  if (error || !scenarios) {
+    return (
+      <EmptyState
+        title="Scenario library unavailable"
+        description={error ?? "The backend did not return scenarios."}
+        action={
+          <button onClick={() => void reload()} className="rounded-2xl bg-qp-navy px-4 py-2 text-[13px] text-white">
+            Retry
+          </button>
+        }
+      />
+    );
+  }
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 style={{ fontSize: "20px", fontWeight: 600 }}>Scenarios</h1>
-          <p className="text-muted-foreground" style={{ fontSize: "13px" }}>{scenarios.length} scenarios in workspace</p>
-        </div>
-        <Link to="/app/scenarios/workspace" className="flex items-center gap-2 bg-qp-navy text-white px-4 py-2 rounded-lg hover:bg-qp-slate transition-colors" style={{ fontSize: "13px" }}>
-          <Plus className="w-3.5 h-3.5" /> New scenario
-        </Link>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Scenario library"
+        title="Persisted wildfire scenarios"
+        description="Manage reusable 10x10 constrained spatial systems. Every scenario edit is versioned so later risk, forecast, optimization, and benchmark runs can reference the exact state they used."
+        actions={
+          <Link to="/app/scenarios/new" className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white">
+            <span className="inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" /> New scenario
+            </span>
+          </Link>
+        }
+      />
 
-      {/* Search + filters */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 max-w-sm relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search scenarios..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-qp-cyan/30"
-            style={{ fontSize: "13px" }}
-          />
+      <SectionPanel>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex w-full max-w-[380px] items-center gap-2 rounded-2xl border border-border bg-white px-4 py-2.5">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search name or status"
+              className="w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <p className="text-[12px] text-muted-foreground">{filtered.length} scenarios available</p>
         </div>
-        <div className="flex items-center gap-1.5">
-          {filters.map((f) => (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className={`px-3 py-1.5 rounded-full border transition-colors ${
-                activeFilter === f ? "bg-qp-navy text-white border-qp-navy" : "border-border text-muted-foreground hover:bg-muted"
-              }`}
-              style={{ fontSize: "12px" }}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-1 border border-border rounded-lg p-0.5">
-          <button
-            onClick={() => setViewMode("table")}
-            className={`p-1.5 rounded ${viewMode === "table" ? "bg-muted" : ""}`}
-          >
-            <List className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setViewMode("grid")}
-            className={`p-1.5 rounded ${viewMode === "grid" ? "bg-muted" : ""}`}
-          >
-            <Grid3X3 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
+      </SectionPanel>
 
-      {/* Table view */}
-      {viewMode === "table" ? (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-background">
-                {["Scenario", "Domain", "Geometry", "Risk Score", "Solver", "Last Run", "Status", ""].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-muted-foreground" style={{ fontSize: "11px", fontWeight: 500 }}>{h}</th>
-                ))}
+      <SectionPanel title="Scenario records" subtitle="These rows are backed by `/api/scenarios`, not a static page-level array.">
+        <div className="overflow-hidden rounded-2xl border border-border">
+          <table className="w-full bg-white/90">
+            <thead className="bg-slate-50">
+              <tr className="text-left text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                <th className="px-4 py-3">Scenario</th>
+                <th className="px-4 py-3">Version</th>
+                <th className="px-4 py-3">Constraints</th>
+                <th className="px-4 py-3">Objective</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s) => (
-                <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3">
-                    <Link to="/app/scenarios/workspace" className="flex items-center gap-2 hover:text-qp-cyan transition-colors">
-                      <s.icon className="w-4 h-4 text-muted-foreground" />
-                      <div>
-                        <p style={{ fontSize: "13px", fontWeight: 500 }}>{s.name}</p>
-                        <p className="text-muted-foreground" style={{ fontSize: "11px" }}>{s.id}</p>
-                      </div>
+              {filtered.map((scenario) => (
+                <tr key={scenario.id} className="border-t border-border text-[13px]">
+                  <td className="px-4 py-4">
+                    <Link to={`/app/scenarios/${scenario.id}`} className="font-medium text-foreground hover:text-qp-cyan">
+                      {scenario.name}
                     </Link>
+                    <p className="mt-1 text-[12px] text-muted-foreground">{scenario.description}</p>
                   </td>
-                  <td className="px-4 py-3" style={{ fontSize: "12px" }}>{s.domain}</td>
-                  <td className="px-4 py-3 text-muted-foreground" style={{ fontSize: "12px" }}>{s.geometry}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4 text-muted-foreground">v{scenario.version}</td>
+                  <td className="px-4 py-4 text-muted-foreground">
+                    K={(scenario.constraints_json.intervention_budget_k as number | undefined) ?? "n/a"} • horizon{" "}
+                    {(scenario.constraints_json.time_horizon_hours as number | undefined) ?? "n/a"}h
+                  </td>
+                  <td className="px-4 py-4 text-muted-foreground">{(scenario.objectives_json.primary as string | undefined) ?? "No primary objective"}</td>
+                  <td className="px-4 py-4">
+                    <StatusPill label={scenario.status} tone={scenario.status === "active" ? "good" : scenario.status === "archived" ? "neutral" : "accent"} />
+                  </td>
+                  <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${s.risk > 60 ? "bg-qp-amber" : s.risk > 40 ? "bg-qp-cyan" : "bg-emerald-400"}`}
-                          style={{ width: `${s.risk}%` }}
-                        />
-                      </div>
-                      <span style={{ fontSize: "12px", fontWeight: 500 }}>{s.risk}</span>
+                      <button onClick={() => void duplicateScenario(scenario.id)} className="rounded-xl border border-border p-2 text-muted-foreground hover:text-foreground">
+                        <Copy className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => void archiveScenario(scenario.id)} className="rounded-xl border border-border p-2 text-muted-foreground hover:text-foreground">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full ${
-                      s.solver === "Quantum" ? "bg-qp-violet/10 text-qp-violet" :
-                      s.solver === "Hybrid" ? "bg-qp-cyan/10 text-qp-cyan" :
-                      "bg-blue-50 text-blue-600"
-                    }`} style={{ fontSize: "11px" }}>{s.solver}</span>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground" style={{ fontSize: "12px" }}>
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {s.lastRun}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full ${
-                      s.status === "Active" ? "bg-emerald-50 text-emerald-600" :
-                      s.status === "Draft" ? "bg-amber-50 text-amber-600" :
-                      "bg-gray-100 text-gray-500"
-                    }`} style={{ fontSize: "11px" }}>{s.status}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button className="p-1 rounded hover:bg-muted"><MoreHorizontal className="w-4 h-4 text-muted-foreground" /></button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-4">
-          {filtered.map((s) => (
-            <Link to="/app/scenarios/workspace" key={s.id} className="bg-card rounded-xl border border-border p-5 hover:shadow-sm transition-shadow">
-              <div className="flex items-center gap-2 mb-3">
-                <s.icon className="w-4 h-4 text-muted-foreground" />
-                <span className={`px-2 py-0.5 rounded-full ${
-                  s.status === "Active" ? "bg-emerald-50 text-emerald-600" :
-                  s.status === "Draft" ? "bg-amber-50 text-amber-600" : "bg-gray-100 text-gray-500"
-                }`} style={{ fontSize: "10px" }}>{s.status}</span>
-              </div>
-              <h3 style={{ fontSize: "14px", fontWeight: 600 }}>{s.name}</h3>
-              <p className="text-muted-foreground mt-1" style={{ fontSize: "12px" }}>{s.domain} · {s.geometry}</p>
-              <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
-                <span className="text-muted-foreground" style={{ fontSize: "11px" }}>Risk: {s.risk}</span>
-                <span className={`px-2 py-0.5 rounded-full ${
-                  s.solver === "Quantum" ? "bg-qp-violet/10 text-qp-violet" :
-                  s.solver === "Hybrid" ? "bg-qp-cyan/10 text-qp-cyan" : "bg-blue-50 text-blue-600"
-                }`} style={{ fontSize: "11px" }}>{s.solver}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+      </SectionPanel>
     </div>
   );
 }

@@ -1,191 +1,114 @@
-import { useState } from "react";
-import { Target, Save, Download, GitCompare, CheckCircle, ArrowRight } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 
-const interventions = [
-  { rank: 1, cell: "(3, 4)", type: "Firebreak", cost: "$340K", impact: -18.2, confidence: 0.94 },
-  { rank: 2, cell: "(5, 7)", type: "Firebreak", cost: "$290K", impact: -15.7, confidence: 0.91 },
-  { rank: 3, cell: "(2, 8)", type: "Resource Deploy", cost: "$420K", impact: -14.3, confidence: 0.88 },
-  { rank: 4, cell: "(7, 2)", type: "Firebreak", cost: "$310K", impact: -12.1, confidence: 0.86 },
-  { rank: 5, cell: "(1, 5)", type: "Monitoring", cost: "$180K", impact: -8.9, confidence: 0.83 },
-  { rank: 6, cell: "(6, 9)", type: "Resource Deploy", cost: "$380K", impact: -7.4, confidence: 0.79 },
-];
-
-const comparisonData = [
-  { label: "Classical Heuristic", before: 85.7, after: 52.3 },
-  { label: "Quantum QAOA", before: 85.7, after: 41.8 },
-  { label: "Hybrid VQE", before: 85.7, after: 38.2 },
-];
+import { api } from "../api";
+import { EmptyState, LoadingState, MetricTile, PageHeader, ScenarioGrid, SectionPanel, StatusPill } from "../components/product";
+import { useAsyncData } from "../useAsyncData";
 
 export function OptimizePage() {
-  const [selectedPlan, setSelectedPlan] = useState(0);
+  const [params] = useSearchParams();
+  const [scenarioId, setScenarioId] = useState(params.get("scenario") ?? "");
+  const [budget, setBudget] = useState(10);
+  const [reducedCount, setReducedCount] = useState(8);
+  const [run, setRun] = useState<any | null>(null);
+  const [running, setRunning] = useState(false);
+  const { data: scenarios, loading, error } = useAsyncData(api.listScenarios, []);
+
+  const selectedScenario = useMemo(() => scenarios?.find((scenario) => scenario.id === scenarioId) ?? scenarios?.[0], [scenarioId, scenarios]);
+  const activeScenarioId = scenarioId || selectedScenario?.id || "";
+
+  async function execute() {
+    if (!activeScenarioId) return;
+    setRunning(true);
+    try {
+      const response = await api.runOptimize({
+        scenario_id: activeScenarioId,
+        intervention_budget_k: budget,
+        reduced_candidate_count: reducedCount,
+      });
+      setRun(response);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const placementLookup = Object.fromEntries(
+    ((run?.results?.hybrid?.placements as Array<any> | undefined) ?? []).map((item) => [`${item.row}-${item.col}`, 1]),
+  );
+
+  if (loading) return <LoadingState label="Loading optimization workspace..." />;
+  if (error || !scenarios) return <EmptyState title="Optimization workspace unavailable" description={error ?? "Could not load scenarios."} />;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 style={{ fontSize: "20px", fontWeight: 600 }}>Intervention Optimization</h1>
-          <p className="text-muted-foreground" style={{ fontSize: "13px" }}>Sierra Nevada — Optimal intervention placement under constraints</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors" style={{ fontSize: "13px" }}>
-            <GitCompare className="w-3.5 h-3.5" /> Compare plans
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Optimize"
+        title="Constrained intervention planning"
+        description="Full-grid classical screening remains the baseline. Quantum analysis is restricted to a reduced critical subgraph and labeled that way explicitly so the app never overclaims realistic NISQ scale."
+        actions={
+          <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white">
+            {running ? "Running..." : "Run optimization"}
           </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors" style={{ fontSize: "13px" }}>
-            <Download className="w-3.5 h-3.5" /> Export
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-qp-navy text-white hover:bg-qp-slate transition-colors" style={{ fontSize: "13px" }}>
-            <Save className="w-3.5 h-3.5" /> Save plan
-          </button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Key answer cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-muted-foreground mb-1" style={{ fontSize: "12px" }}>What should I do?</p>
-          <p style={{ fontSize: "20px", fontWeight: 600 }}>6 interventions</p>
-          <p className="text-muted-foreground mt-1" style={{ fontSize: "12px" }}>across 4 firebreaks, 2 resource deployments</p>
-        </div>
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-muted-foreground mb-1" style={{ fontSize: "12px" }}>Why these interventions?</p>
-          <p style={{ fontSize: "20px", fontWeight: 600 }}>-55.4% risk</p>
-          <p className="text-muted-foreground mt-1" style={{ fontSize: "12px" }}>Hybrid optimizer found optimal placement</p>
-        </div>
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-muted-foreground mb-1" style={{ fontSize: "12px" }}>What do I gain vs alternatives?</p>
-          <p style={{ fontSize: "20px", fontWeight: 600 }}>+14.1 pts</p>
-          <p className="text-muted-foreground mt-1" style={{ fontSize: "12px" }}>better than classical heuristic approach</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        {/* Canvas with interventions */}
-        <div className="col-span-2 bg-card rounded-xl border border-border p-5">
-          <h3 className="mb-3" style={{ fontSize: "14px", fontWeight: 600 }}>Intervention Map</h3>
-          <div className="grid grid-cols-10 gap-1 relative">
-            {Array.from({ length: 100 }).map((_, i) => {
-              const r = Math.floor(i / 10);
-              const c = i % 10;
-              const isIntervention = interventions.some(
-                (int) => int.cell === `(${r}, ${c})`
-              );
-              const risk = Math.random();
-              const baseColor = risk > 0.7 ? "bg-red-300" : risk > 0.4 ? "bg-amber-200" : risk > 0.15 ? "bg-cyan-100" : "bg-slate-100";
-              return (
-                <div
-                  key={i}
-                  className={`aspect-square rounded-sm relative ${isIntervention ? "bg-qp-violet ring-2 ring-qp-violet" : baseColor}`}
-                >
-                  {isIntervention && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Target className="w-3 h-3 text-white" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex items-center gap-3 mt-3" style={{ fontSize: "10px" }}>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-qp-violet" /> Intervention</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-red-300" /> High risk</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-200" /> Medium</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-cyan-100" /> Low</span>
-          </div>
-        </div>
-
-        {/* Budget panel */}
-        <div className="space-y-4">
-          <div className="bg-card rounded-xl border border-border p-5">
-            <h3 className="mb-3" style={{ fontSize: "14px", fontWeight: 600 }}>Budget</h3>
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-muted-foreground" style={{ fontSize: "12px" }}>Total Budget</span>
-                  <span style={{ fontSize: "12px", fontWeight: 600 }}>$2,400,000</span>
-                </div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-muted-foreground" style={{ fontSize: "12px" }}>Allocated</span>
-                  <span className="text-qp-violet" style={{ fontSize: "12px", fontWeight: 600 }}>$1,920,000</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden mt-2">
-                  <div className="h-full bg-qp-violet rounded-full" style={{ width: "80%" }} />
-                </div>
-                <p className="text-muted-foreground mt-1" style={{ fontSize: "11px" }}>80% utilized — $480K remaining</p>
-              </div>
-              <div className="pt-3 border-t border-border">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground" style={{ fontSize: "12px" }}>Max Interventions</span>
-                  <span style={{ fontSize: "12px", fontWeight: 500 }}>8</span>
-                </div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-muted-foreground" style={{ fontSize: "12px" }}>Used</span>
-                  <span style={{ fontSize: "12px", fontWeight: 500 }}>6 of 8</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-card rounded-xl border border-border p-5">
-            <h3 className="mb-2" style={{ fontSize: "14px", fontWeight: 600 }}>Objective Score</h3>
-            <p style={{ fontSize: "32px", fontWeight: 600, color: "#06b6d4" }}>38.2</p>
-            <p className="text-muted-foreground" style={{ fontSize: "12px" }}>Residual risk score (lower is better)</p>
-            <div className="flex items-center gap-1 mt-2 text-emerald-600" style={{ fontSize: "12px" }}>
-              <CheckCircle className="w-3 h-3" /> 55.4% reduction from baseline
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Ranked intervention list */}
-      <div className="bg-card rounded-xl border border-border p-5">
-        <h3 className="mb-4" style={{ fontSize: "14px", fontWeight: 600 }}>Ranked Interventions</h3>
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              {["Rank", "Cell", "Type", "Cost", "Risk Impact", "Confidence"].map((h) => (
-                <th key={h} className="text-left py-2 text-muted-foreground" style={{ fontSize: "11px", fontWeight: 500 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {interventions.map((int) => (
-              <tr key={int.rank} className="border-b border-border last:border-0 hover:bg-muted/20">
-                <td className="py-2.5">
-                  <span className="w-6 h-6 rounded-full bg-qp-violet/10 text-qp-violet inline-flex items-center justify-center" style={{ fontSize: "11px", fontWeight: 600 }}>
-                    {int.rank}
-                  </span>
-                </td>
-                <td className="py-2.5" style={{ fontSize: "12px", fontWeight: 500 }}>{int.cell}</td>
-                <td className="py-2.5">
-                  <span className={`px-2 py-0.5 rounded-full ${
-                    int.type === "Firebreak" ? "bg-slate-100 text-slate-600" :
-                    int.type === "Resource Deploy" ? "bg-qp-violet/10 text-qp-violet" :
-                    "bg-qp-cyan/10 text-qp-cyan"
-                  }`} style={{ fontSize: "11px" }}>{int.type}</span>
-                </td>
-                <td className="py-2.5" style={{ fontSize: "12px" }}>{int.cost}</td>
-                <td className="py-2.5 text-emerald-600" style={{ fontSize: "12px", fontWeight: 500 }}>{int.impact}%</td>
-                <td className="py-2.5" style={{ fontSize: "12px" }}>{(int.confidence * 100).toFixed(0)}%</td>
-              </tr>
+      <SectionPanel>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <select value={activeScenarioId} onChange={(event) => setScenarioId(event.target.value)} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none">
+            {scenarios.map((scenario) => (
+              <option key={scenario.id} value={scenario.id}>
+                {scenario.name}
+              </option>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </select>
+          <input type="number" min={1} max={20} value={budget} onChange={(event) => setBudget(Number(event.target.value))} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none" />
+          <input type="number" min={4} max={12} value={reducedCount} onChange={(event) => setReducedCount(Number(event.target.value))} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none" />
+        </div>
+      </SectionPanel>
 
-      {/* Before/after + solver comparison */}
-      <div className="bg-card rounded-xl border border-border p-5">
-        <h3 className="mb-4" style={{ fontSize: "14px", fontWeight: 600 }}>Solver Comparison — Before vs After</h3>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={comparisonData} layout="vertical" barGap={4}>
-            <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#636882" }} />
-            <YAxis dataKey="label" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#636882" }} width={120} />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid rgba(0,0,0,0.08)" }} />
-            <Bar dataKey="before" fill="#e8eaef" radius={[0, 3, 3, 0]} name="Before" />
-            <Bar dataKey="after" fill="#8b5cf6" radius={[0, 3, 3, 0]} name="After" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {run ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <MetricTile label="Recommended mode" value={run.summary.recommended_mode} hint={run.summary.full_scale_scope} />
+            <MetricTile label="Connectivity reduction" value={String(run.summary.connectivity_reduction)} hint="Largest high-risk component shrinkage" />
+            <MetricTile label="Reduced quantum scope" value={String(run.results.quantum.scope.candidate_count)} hint={`Budget ${run.results.quantum.scope.budget}`} />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <SectionPanel title="Hybrid intervention layout" subtitle="Highlighted placements reflect the combined classical full-grid and reduced quantum study recommendation.">
+              <ScenarioGrid grid={selectedScenario?.grid ?? []} scoreLookup={placementLookup} />
+              <div className="mt-4 flex flex-wrap gap-2">
+                <StatusPill label={`Before LCC ${run.results.classical.before_connectivity.largest_component}`} tone="warn" />
+                <StatusPill label={`After LCC ${run.results.classical.after_connectivity.largest_component}`} tone="good" />
+              </div>
+            </SectionPanel>
+
+            <SectionPanel title="Placement rationale" subtitle="Recommended placements and reduced-study detail">
+              <div className="space-y-3">
+                {(run.results.hybrid.placements as Array<any>).slice(0, budget).map((placement) => (
+                  <div key={`${placement.row}-${placement.col}`} className="rounded-2xl border border-border bg-white/80 p-4">
+                    <p className="text-[13px] font-semibold">
+                      Row {placement.row + 1}, Col {placement.col + 1}
+                    </p>
+                    <p className="mt-1 text-[12px] text-muted-foreground">{placement.reason}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 rounded-2xl border border-border bg-white/80 p-4">
+                <p className="text-[13px] font-semibold">Reduced quantum study</p>
+                <p className="mt-2 text-[12px] text-muted-foreground">
+                  Approximation ratio {run.results.quantum.approximation_ratio} • exact reference cost {run.results.quantum.exact_baseline.best_cost}
+                </p>
+              </div>
+            </SectionPanel>
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          title="No optimization run yet"
+          description="Run intervention planning to compare classical full-scale placement logic against the reduced quantum study and the hybrid recommendation."
+        />
+      )}
     </div>
   );
 }

@@ -1,10 +1,26 @@
-import { useState } from "react";
-import { Outlet, Link, useLocation } from "react-router";
+import { useMemo, useState } from "react";
+import { Link, Outlet, useLocation } from "react-router";
 import {
-  LayoutDashboard, Layers, AlertTriangle, TrendingUp, Target, Cpu,
-  FileText, Plug, Settings, Search, Bell, ChevronDown, Menu, X,
-  Atom, LogOut, User
+  Atom,
+  Bell,
+  ChevronDown,
+  Cpu,
+  FileText,
+  LayoutDashboard,
+  Layers,
+  LogOut,
+  Plug,
+  Search,
+  Settings,
+  ShieldCheck,
+  Target,
+  TrendingUp,
+  AlertTriangle,
 } from "lucide-react";
+
+import { api } from "../api";
+import { SimulatorBanner, StatusPill, cx } from "./product";
+import { useAsyncData } from "../useAsyncData";
 
 const navItems = [
   { path: "/app", label: "Overview", icon: LayoutDashboard },
@@ -20,139 +36,118 @@ const navItems = [
 
 export function AppShell() {
   const location = useLocation();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const { data: integrations } = useAsyncData(api.integrations, []);
+
+  const activeLabel = useMemo(
+    () => navItems.find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))?.label ?? "Workspace",
+    [location.pathname],
+  );
 
   return (
-    <div className="h-screen flex bg-background overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Sidebar */}
-      <aside
-        className={`${sidebarCollapsed ? "w-16" : "w-56"} bg-sidebar flex flex-col transition-all duration-200 shrink-0`}
-      >
-        <div className="h-14 flex items-center px-4 border-b border-sidebar-border">
-          <Atom className="w-6 h-6 text-qp-cyan shrink-0" />
-          {!sidebarCollapsed && (
-            <span className="ml-2.5 text-white tracking-tight" style={{ fontSize: "15px", fontWeight: 600 }}>
-              QuantumProj
-            </span>
-          )}
-        </div>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.08),transparent_28%),linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] text-foreground">
+      <div className="mx-auto flex min-h-screen max-w-[1600px]">
+        <aside className="hidden w-[280px] shrink-0 border-r border-white/60 bg-[linear-gradient(180deg,#0f1729_0%,#111f36_100%)] px-5 py-6 text-white lg:flex lg:flex-col">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
+              <Atom className="h-5 w-5 text-qp-cyan" />
+            </div>
+            <div>
+              <p className="text-[15px] font-semibold">QuantumProj</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-white/45">Wildfire resilience</p>
+            </div>
+          </div>
 
-        {/* Workspace switcher */}
-        {!sidebarCollapsed && (
-          <div className="px-3 py-3 border-b border-sidebar-border">
-            <button className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-sidebar-accent text-sidebar-foreground hover:bg-white/10 transition-colors">
-              <div className="w-5 h-5 rounded bg-qp-violet/30 flex items-center justify-center" style={{ fontSize: "10px", color: "#c4b5fd" }}>
-                W
+          <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-white/40">Workspace</p>
+                <p className="mt-2 text-[15px] font-medium">Wildfire West</p>
               </div>
-              <span style={{ fontSize: "13px" }}>Wildfire West</span>
-              <ChevronDown className="w-3 h-3 ml-auto opacity-50" />
-            </button>
+              <ChevronDown className="h-4 w-4 text-white/50" />
+            </div>
+            <p className="mt-3 text-[12px] leading-5 text-white/58">
+              Scenario setup, solver comparison, and compiler-aware benchmarking in one operating surface.
+            </p>
           </div>
-        )}
 
-        <nav className="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path ||
-              (item.path !== "/app" && location.pathname.startsWith(item.path));
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md transition-colors ${
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                } ${sidebarCollapsed ? "justify-center" : ""}`}
-                style={{ fontSize: "13px" }}
-              >
-                <item.icon className="w-4 h-4 shrink-0" />
-                {!sidebarCollapsed && <span>{item.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
+          <nav className="mt-8 space-y-1">
+            {navItems.map((item) => {
+              const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cx(
+                    "flex items-center gap-3 rounded-2xl px-4 py-3 text-[13px] transition-colors",
+                    active ? "bg-white text-slate-900 shadow-sm" : "text-white/70 hover:bg-white/8 hover:text-white",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
 
-        <div className="p-2 border-t border-sidebar-border">
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full flex items-center justify-center p-1.5 rounded-md text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          >
-            {sidebarCollapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
-          </button>
+          <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-qp-cyan" />
+              <p className="text-[13px] font-medium">Execution integrity</p>
+            </div>
+            <p className="mt-2 text-[12px] leading-5 text-white/55">
+              Benchmark runs are labeled by actual availability. Hardware and qBraid capability are never inferred from placeholders.
+            </p>
+          </div>
+        </aside>
+
+        <div className="flex min-h-screen flex-1 flex-col">
+          <header className="sticky top-0 z-20 border-b border-white/70 bg-white/80 px-5 py-4 backdrop-blur xl:px-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">QuantumProj</p>
+                <h1 className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-foreground">{activeLabel}</h1>
+              </div>
+              <div className="flex flex-1 items-center gap-3 lg:justify-end">
+                <div className="flex w-full max-w-[420px] items-center gap-2 rounded-2xl border border-border bg-white px-4 py-2.5">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search scenarios or run IDs"
+                    className="w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
+                  />
+                </div>
+                {integrations ? (
+                  <StatusPill label={integrations.simulator_only ? "Simulator only" : "Hardware ready"} tone={integrations.simulator_only ? "warn" : "good"} />
+                ) : null}
+                <button className="rounded-2xl border border-border bg-white p-2.5 text-muted-foreground transition-colors hover:text-foreground">
+                  <Bell className="h-4 w-4" />
+                </button>
+                <div className="hidden items-center gap-3 rounded-2xl border border-border bg-white px-3 py-2.5 md:flex">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-qp-navy text-[12px] font-semibold text-white">
+                    JD
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium">Jane Doe</p>
+                    <p className="text-[11px] text-muted-foreground">Platform lead</p>
+                  </div>
+                  <LogOut className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 px-5 py-6 xl:px-8">
+            {integrations ? (
+              <div className="mb-6">
+                <SimulatorBanner simulatorOnly={integrations.simulator_only} qbraidReady={integrations.qbraid_ready} />
+              </div>
+            ) : null}
+            <Outlet />
+          </main>
         </div>
-      </aside>
-
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <header className="h-14 bg-card border-b border-border flex items-center px-5 gap-4 shrink-0">
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-input-background cursor-pointer hover:bg-muted transition-colors"
-              onClick={() => setSearchOpen(!searchOpen)}
-            >
-              <Search className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground" style={{ fontSize: "13px" }}>
-                Search scenarios, reports...
-              </span>
-              <kbd className="ml-auto text-muted-foreground bg-white/80 px-1.5 py-0.5 rounded border border-border" style={{ fontSize: "10px" }}>
-                ⌘K
-              </kbd>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Notifications */}
-            <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">
-              <Bell className="w-4 h-4 text-muted-foreground" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-qp-cyan rounded-full" />
-            </button>
-
-            {/* User menu */}
-            <div className="relative">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-muted transition-colors"
-              >
-                <div className="w-7 h-7 rounded-full bg-qp-navy flex items-center justify-center">
-                  <span className="text-white" style={{ fontSize: "11px", fontWeight: 500 }}>JD</span>
-                </div>
-                {!sidebarCollapsed && <ChevronDown className="w-3 h-3 text-muted-foreground" />}
-              </button>
-              {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-card rounded-lg shadow-lg border border-border py-1 z-50">
-                  <div className="px-3 py-2 border-b border-border">
-                    <p style={{ fontSize: "13px", fontWeight: 500 }}>Jane Doe</p>
-                    <p className="text-muted-foreground" style={{ fontSize: "12px" }}>jane@quantumproj.io</p>
-                  </div>
-                  <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" style={{ fontSize: "13px" }}>
-                    <User className="w-3.5 h-3.5" /> Profile
-                  </button>
-                  <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" style={{ fontSize: "13px" }}>
-                    <Settings className="w-3.5 h-3.5" /> Settings
-                  </button>
-                  <div className="border-t border-border mt-1 pt-1">
-                    <Link to="/login" className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-destructive" style={{ fontSize: "13px" }}>
-                      <LogOut className="w-3.5 h-3.5" /> Sign out
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto">
-          <Outlet />
-        </main>
       </div>
-
-      {/* Click outside to close user menu */}
-      {userMenuOpen && <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />}
     </div>
   );
 }
