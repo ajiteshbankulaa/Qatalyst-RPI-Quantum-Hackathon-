@@ -4,7 +4,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import Scenario
-from app.schema_scenario import ScenarioCreate, ScenarioUpdate
+from app.schemas.scenario import ScenarioCreate, ScenarioUpdate
 
 
 def list_scenarios(db: Session) -> list[Scenario]:

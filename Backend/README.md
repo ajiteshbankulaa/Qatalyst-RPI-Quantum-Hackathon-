@@ -16,7 +16,7 @@ FastAPI backend for the QuantumProj MVP. This service owns persisted scenarios, 
 
 ## Architecture
 
-The backend is intentionally modular but flat under `Backend/app/` because nested directory creation was blocked in this workspace.
+The backend is now organized under `Backend/app/` with package folders for routes, schemas, and services.
 
 - `main.py`
   - FastAPI app creation, CORS, route registration, startup bootstrap
@@ -24,27 +24,27 @@ The backend is intentionally modular but flat under `Backend/app/` because neste
   - SQLAlchemy engine, session factory, dependency injection helper
 - `models.py`
   - ORM models for `Scenario`, `RiskRun`, `ForecastRun`, `OptimizationRun`, `BenchmarkRun`, `Report`, and `IntegrationStatus`
-- `schema_*.py`
+- `schemas/*.py`
   - Pydantic request/response contracts per module
-- `service_scenarios.py`
+- `services/scenarios.py`
   - Scenario CRUD and version bumps
-- `service_risk.py`
+- `services/risk.py`
   - Classical and analytic quantum-style scoring over shared features
-- `service_forecast.py`
+- `services/forecast.py`
   - Grid spread simulation plus shift-kernel diagnostics
-- `service_optimize.py`
+- `services/optimize.py`
   - Full-grid classical intervention planning plus reduced quantum study
-- `service_qaoa.py`
-  - Lightweight analytic QAOA-style routines for reduced subproblems
-- `service_benchmarks.py`
-  - Benchmark orchestration, availability detection, degraded-mode handling
-- `service_reports.py`
+- `services/qaoa.py`
+  - QAOA problem formulation, real Qiskit circuit construction, and simulator execution helpers
+- `services/benchmarks.py`
+  - qBraid-centered benchmark orchestration, compilation strategy comparison, and execution metric collection
+- `services/reports.py`
   - Report assembly and markdown export payload generation
-- `service_integrations.py`
+- `services/integrations.py`
   - qBraid / Qiskit / IBM / simulator capability detection
-- `service_bootstrap.py`
+- `services/bootstrap.py`
   - Seeded wildfire scenarios for first launch
-- `route_*.py`
+- `routes/*.py`
   - FastAPI route modules mapped to product areas
 
 ## Honesty rules implemented here
@@ -82,24 +82,36 @@ Core product endpoints:
 
 ## Environment variables
 
-Optional:
+Backend variable names are standardized to:
 
 - `QUANTUMPROJ_DB_PATH`
-  - Override the SQLite file location
 - `QBRAID_API_KEY`
-  - Enables qBraid account-backed capability detection
 - `QISKIT_IBM_TOKEN`
-  - Enables IBM Quantum hardware-ready status
-- `QISKIT_IBM_CHANNEL`
-  - Optional IBM channel metadata
 - `QISKIT_IBM_INSTANCE`
-  - Optional IBM instance metadata
+- `CORS_ORIGINS`
 
-Current local behavior without extra setup:
+Use [`.env.example`](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/.env.example) as the canonical backend template.
 
-- Backend launches successfully
-- Seeded wildfire scenarios are created on first run
-- Benchmarks remain degraded because `qbraid` and `qiskit` are not installed in this environment
+## Runtime modes
+
+### Simulator-only
+
+- no IBM credentials, invalid IBM credentials, or no hardware connectivity
+- ideal and noisy simulator execution remains available
+- benchmark runs still execute when the local SDK stack is installed
+
+### qBraid-ready
+
+- `qbraid`, `qiskit`, and `qiskit-aer` installed
+- benchmark engine builds a real Qiskit QAOA workload
+- qBraid is used as the conversion bridge in the compile workflow
+- two compilation strategies are compared with real compiled metrics
+
+### IBM-ready
+
+- `QISKIT_IBM_TOKEN` plus a valid instance / CRN when needed
+- IBM readiness is surfaced honestly in integrations
+- the current benchmark MVP still prioritizes simulator execution while IBM connectivity is treated as an available extension path
 
 ## Launch guide
 
@@ -132,10 +144,33 @@ pytest Backend/test_api.py
 Current verification status:
 
 - `pytest Backend/test_api.py` passes
+- local imports verified for:
+  - `qbraid`
+  - `qiskit`
+  - `qiskit-aer`
+  - `qiskit-ibm-runtime`
+
+## Benchmark implementation note
+
+The benchmark engine now uses real quantum code:
+
+- builds a reduced intervention-planning QAOA circuit in Qiskit
+- uses qBraid as the circuit conversion bridge through OpenQASM 2
+- compares two strategies:
+  - qBraid bridge + Qiskit optimization level 1
+  - qBraid bridge + Qiskit optimization level 3
+- records real:
+  - depth
+  - two-qubit gate count
+  - width
+  - shots
+  - gate breakdown
+  - approximation ratio
+  - success probability
 
 ## Future extension points
 
 - Replace SQLite with PostgreSQL by swapping the SQLAlchemy database URL
-- Move analytic benchmark placeholders to real qBraid + Qiskit execution once those packages are installed
+- Add optional IBM-backed benchmark execution once runtime access is validated end to end
 - Add async job execution if runs become long-lived
 - Add authenticated user/workspace ownership to the scenario and report models

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import BenchmarkRun, OptimizationRun
-from app.schema_benchmark import BenchmarkRunCreate, BenchmarkRunResponse
-from app.service_benchmarks import create_benchmark_run
-from app.service_scenarios import get_scenario_or_404
+from app.schemas.benchmark import BenchmarkRunCreate, BenchmarkRunResponse
+from app.services.benchmarks import create_benchmark_run
+from app.services.scenarios import get_scenario_or_404
 
 router = APIRouter(prefix="/benchmarks", tags=["benchmarks"])
 
@@ -39,8 +39,11 @@ def create_benchmark_run_endpoint(payload: BenchmarkRunCreate, db: Session = Dep
 
 
 @router.get("", response_model=list[BenchmarkRunResponse])
-def list_benchmark_runs_endpoint(db: Session = Depends(get_db)):
-    stmt = select(BenchmarkRun).order_by(desc(BenchmarkRun.created_at))
+def list_benchmark_runs_endpoint(scenario_id: str | None = Query(default=None), db: Session = Depends(get_db)):
+    stmt = select(BenchmarkRun)
+    if scenario_id:
+        stmt = stmt.where(BenchmarkRun.scenario_id == scenario_id)
+    stmt = stmt.order_by(desc(BenchmarkRun.created_at))
     return [_serialize(run) for run in db.scalars(stmt)]
 
 

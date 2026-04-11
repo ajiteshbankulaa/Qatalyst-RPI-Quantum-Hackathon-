@@ -1,6 +1,36 @@
+import { CheckCircle2, XCircle } from "lucide-react";
+
 import { api } from "../api";
-import { EmptyState, LoadingState, PageHeader, SectionPanel, StatusPill } from "../components/product";
+import { EmptyState, LoadingState, PageHeader, SectionPanel, StatusPill, cx } from "../components/product";
 import { useAsyncData } from "../useAsyncData";
+
+function DetailRow({ label, value, available }: { label: string; value: string; available?: boolean }) {
+  return (
+    <div className="flex items-center justify-between border-b border-border/50 py-2.5 last:border-0">
+      <span className="text-[12px] text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-[12px] font-medium text-foreground">{value}</span>
+        {available !== undefined && (
+          available ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-red-400" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+const providerLabels: Record<string, string> = {
+  qbraid: "qBraid SDK",
+  qiskit: "Qiskit",
+  ibm_quantum: "IBM Quantum",
+  local_simulators: "Local Simulators",
+};
+
+const providerDescriptions: Record<string, string> = {
+  qbraid: "Cross-framework transpilation and compiler-aware benchmarking backbone.",
+  qiskit: "Primary quantum circuit framework for QAOA workloads and Aer simulator execution.",
+  ibm_quantum: "Cloud-based quantum hardware access via IBM Quantum Runtime.",
+  local_simulators: "Qiskit Aer ideal and noisy simulation backends for local execution.",
+};
 
 export function IntegrationsPage() {
   const { data, loading, error, reload } = useAsyncData(api.integrations, []);
@@ -24,21 +54,77 @@ export function IntegrationsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Integrations"
-        title="Execution and compiler connectivity"
-        description="Visibility into qBraid, Qiskit, IBM Quantum, and simulator readiness. Missing credentials do not hard-fail the product; they produce a transparent degraded mode instead."
+        title="Execution & compiler connectivity"
+        description="Live status of qBraid, Qiskit, IBM Quantum, and simulator backends. Missing credentials produce transparent degraded mode — the product never crashes or fabricates availability."
       />
 
+      {/* Summary badges */}
+      <SectionPanel>
+        <div className="flex flex-wrap gap-3">
+          <StatusPill label={data.qbraid_ready ? "qBraid ready" : "qBraid missing"} tone={data.qbraid_ready ? "good" : "warn"} />
+          <StatusPill label={data.hardware_available ? "IBM hardware available" : "Simulator only"} tone={data.hardware_available ? "good" : "warn"} />
+          <StatusPill label={data.simulator_only ? "Running in simulator-only mode" : "Full execution mode"} tone={data.simulator_only ? "warn" : "good"} />
+        </div>
+      </SectionPanel>
+
       <div className="grid gap-6 md:grid-cols-2">
-        {data.providers.map((provider) => (
-          <SectionPanel key={provider.provider} title={provider.provider} subtitle={provider.mode}>
-            <div className="flex items-center justify-between">
-              <StatusPill label={provider.available ? "Available" : "Unavailable"} tone={provider.available ? "good" : "warn"} />
-            </div>
-            <pre className="mt-4 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-[11px] leading-5 text-slate-100">
-              {JSON.stringify(provider.details, null, 2)}
-            </pre>
-          </SectionPanel>
-        ))}
+        {data.providers.map((provider) => {
+          const details = provider.details ?? {};
+          return (
+            <SectionPanel
+              key={provider.provider}
+              title={providerLabels[provider.provider] ?? provider.provider}
+              subtitle={providerDescriptions[provider.provider] ?? ""}
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <StatusPill label={provider.available ? "Available" : "Unavailable"} tone={provider.available ? "good" : "warn"} />
+                <StatusPill label={provider.mode} tone={provider.mode === "ready" || provider.mode === "hardware_ready" ? "good" : "neutral"} />
+              </div>
+
+              <div className="rounded-xl border border-border bg-white/60 px-4 py-2">
+                {provider.provider === "qbraid" && (
+                  <>
+                    <DetailRow label="SDK installed" value={details.installed ? "Yes" : "No"} available={details.installed} />
+                    {details.version && <DetailRow label="Version" value={details.version} />}
+                    <DetailRow label="API key configured" value={details.api_key_configured ? "Yes" : "No"} available={details.api_key_configured} />
+                    <DetailRow label="Transpiler available" value={details.transpiler_available ? "Yes" : "No"} available={details.transpiler_available} />
+                  </>
+                )}
+                {provider.provider === "qiskit" && (
+                  <>
+                    <DetailRow label="SDK installed" value={details.sdk_installed ? "Yes" : "No"} available={details.sdk_installed} />
+                    {details.version && <DetailRow label="Version" value={details.version} />}
+                    <DetailRow label="Aer installed" value={details.aer_installed ? "Yes" : "No"} available={details.aer_installed} />
+                    {details.aer_version && <DetailRow label="Aer version" value={details.aer_version} />}
+                  </>
+                )}
+                {provider.provider === "ibm_quantum" && (
+                  <>
+                    <DetailRow label="Token configured" value={details.token_configured ? "Yes" : "No"} available={details.token_configured} />
+                    <DetailRow label="Connected" value={details.connected ? "Yes" : "No"} available={details.connected} />
+                    <DetailRow label="Channel" value={details.channel ?? "—"} />
+                    <DetailRow label="Instance" value={details.instance ?? "—"} />
+                    {details.runtime_version && <DetailRow label="Runtime version" value={details.runtime_version} />}
+                    {details.total_backends != null && <DetailRow label="Available backends" value={String(details.total_backends)} />}
+                    {details.reason && !details.connected && (
+                      <p className="mt-2 text-[11px] leading-4 text-amber-700">{details.reason}</p>
+                    )}
+                  </>
+                )}
+                {provider.provider === "local_simulators" && (
+                  <>
+                    <DetailRow label="Aer installed" value={details.aer_installed ? "Yes" : "No"} available={details.aer_installed} />
+                    {details.aer_version && <DetailRow label="Aer version" value={details.aer_version} />}
+                    <DetailRow label="Ideal simulator" value={details.ideal_simulator ? "Available" : "Unavailable"} available={details.ideal_simulator} />
+                    <DetailRow label="Noisy simulator" value={details.noisy_simulator ? "Available" : "Unavailable"} available={details.noisy_simulator} />
+                    <DetailRow label="Noise model" value={details.noise_model ?? "—"} />
+                    {details.methods && <DetailRow label="Methods" value={details.methods.join(", ")} />}
+                  </>
+                )}
+              </div>
+            </SectionPanel>
+          );
+        })}
       </div>
     </div>
   );

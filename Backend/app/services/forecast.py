@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import logging
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.algorithms.shift import build_shift_diagnostics
 from app.models import ForecastRun, Scenario
-from app.service_spatial import diagonal_neighbors, neighbors
+from app.services.spatial import diagonal_neighbors, neighbors
 
+logger = logging.getLogger(__name__)
 
 WIND_VECTORS = {
     "N": (-1, 0),
@@ -56,20 +59,8 @@ def _snapshot(step: int, grid: list[list[str]]) -> dict:
     }
 
 
-def _build_diagnostics(size: int, steps: int) -> dict:
-    baseline_depth = (size - 1) * 3 * steps
-    optimized_depth = (size - 1) * 2 * steps
-    baseline_cx = (size - 1) * 2 * steps
-    optimized_cx = int(baseline_cx * 0.7)
-    return {
-        "diagnostic_mode": "analytical_shift_kernel",
-        "baseline_shift": {"depth": baseline_depth, "two_qubit_gate_count": baseline_cx, "width": size},
-        "optimized_shift": {"depth": optimized_depth, "two_qubit_gate_count": optimized_cx, "width": size},
-        "summary": "Optimized shift logic reduces routing pressure for wind-aligned propagation kernels.",
-    }
-
-
 def create_forecast_run(db: Session, scenario: Scenario, payload: dict) -> ForecastRun:
+    logger.info("Running forecast for scenario %s (%d steps, wind=%s)", scenario.id, payload["steps"], payload["wind_direction"])
     grid = [row[:] for row in scenario.grid]
     snapshots = [_snapshot(0, grid)]
     for step in range(1, payload["steps"] + 1):
@@ -78,7 +69,7 @@ def create_forecast_run(db: Session, scenario: Scenario, payload: dict) -> Forec
 
     final_metrics = snapshots[-1]["metrics"]
     summary = {
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "time_to_threshold": next((snap["step"] for snap in snapshots if snap["metrics"]["ignited_cells"] >= 25), None),
         "peak_ignited_cells": max(snap["metrics"]["ignited_cells"] for snap in snapshots),
         "final_affected_cells": final_metrics["ignited_cells"],
@@ -89,10 +80,11 @@ def create_forecast_run(db: Session, scenario: Scenario, payload: dict) -> Forec
         scenario_version=scenario.version,
         request_json=payload,
         snapshots_json=snapshots,
-        diagnostics_json=_build_diagnostics(len(scenario.grid), payload["steps"]),
+        diagnostics_json=build_shift_diagnostics(len(scenario.grid), payload["steps"]),
         summary_json=summary,
     )
     db.add(run)
     db.commit()
     db.refresh(run)
+    logger.info("Forecast run %s complete — peak ignition: %d cells", run.id, summary["peak_ignited_cells"])
     return run

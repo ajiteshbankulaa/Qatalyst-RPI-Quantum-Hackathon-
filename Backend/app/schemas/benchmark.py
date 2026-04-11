@@ -10,7 +10,7 @@ class BenchmarkRunCreate(BaseModel):
     optimization_run_id: str | None = None
     shots: int = Field(default=256, ge=64, le=4096)
     reduced_candidate_count: int = Field(default=8, ge=4, le=10)
-    environments: list[str] = Field(default_factory=lambda: ["ideal_simulator", "noisy_simulator"])
+    environments: list[str] = Field(default_factory=lambda: ["ideal_simulator", "noisy_simulator", "ibm_hardware"])
 
 
 class BenchmarkRunResponse(BaseModel):

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import type { CellState } from "../types";
 
@@ -13,8 +14,26 @@ const stateStyles: Record<CellState, string> = {
   ignition: "bg-red-300 border-red-400",
 };
 
+const stateLabels: Record<CellState, string> = {
+  empty: "Empty",
+  dry_brush: "Dry Brush",
+  tree: "Tree",
+  water: "Water",
+  protected: "Protected",
+  intervention: "Intervention",
+  ignition: "Ignition",
+};
+
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
+}
+
+export function toastSuccess(message: string, description?: string) {
+  toast.success(message, { description });
+}
+
+export function toastError(message: string, description?: string) {
+  toast.error(message, { description });
 }
 
 export function PageHeader({
@@ -30,10 +49,8 @@ export function PageHeader({
 }) {
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div className="max-w-2xl">
-        {eyebrow ? (
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-qp-cyan">{eyebrow}</p>
-        ) : null}
+      <div className="max-w-3xl">
+        {eyebrow ? <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-qp-cyan">{eyebrow}</p> : null}
         <h1 className="text-[24px] font-semibold tracking-[-0.03em] text-foreground">{title}</h1>
         {description ? <p className="mt-2 text-[13px] leading-6 text-muted-foreground">{description}</p> : null}
       </div>
@@ -56,11 +73,9 @@ export function SectionPanel({
   return (
     <section className={cx("rounded-2xl border border-border bg-card/90 p-5 shadow-[0_20px_60px_-42px_rgba(15,23,41,0.35)]", className)}>
       {title ? (
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
-            {subtitle ? <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{subtitle}</p> : null}
-          </div>
+        <div className="mb-4">
+          <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
+          {subtitle ? <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{subtitle}</p> : null}
         </div>
       ) : null}
       {children}
@@ -93,9 +108,51 @@ export function StatusPill({ label, tone = "neutral" }: { label: string; tone?: 
       : tone === "warn"
       ? "bg-amber-50 text-amber-700"
       : tone === "accent"
-      ? "bg-cyan-50 text-cyan-700"
-      : "bg-slate-100 text-slate-600";
+        ? "bg-cyan-50 text-cyan-700"
+        : "bg-slate-100 text-slate-600";
   return <span className={cx("inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium", toneClass)}>{label}</span>;
+}
+
+export function Notice({
+  tone = "info",
+  title,
+  description,
+}: {
+  tone?: "info" | "success" | "warn" | "error";
+  title: string;
+  description: string;
+}) {
+  const styles =
+    tone === "success"
+      ? {
+          wrap: "border-emerald-200 bg-emerald-50/80 text-emerald-900",
+          icon: <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />,
+        }
+      : tone === "warn"
+        ? {
+            wrap: "border-amber-200 bg-amber-50/80 text-amber-900",
+            icon: <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />,
+          }
+        : tone === "error"
+          ? {
+              wrap: "border-red-200 bg-red-50/80 text-red-900",
+              icon: <XCircle className="mt-0.5 h-4 w-4 shrink-0" />,
+            }
+          : {
+              wrap: "border-cyan-200 bg-cyan-50/70 text-cyan-900",
+              icon: <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />,
+            };
+  return (
+    <div className={cx("rounded-2xl border px-4 py-3 text-[12px]", styles.wrap)}>
+      <div className="flex items-start gap-3">
+        {styles.icon}
+        <div>
+          <p className="font-medium">{title}</p>
+          <p className="mt-1 leading-5">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function SimulatorBanner({ simulatorOnly, qbraidReady }: { simulatorOnly: boolean; qbraidReady: boolean }) {
@@ -103,18 +160,15 @@ export function SimulatorBanner({ simulatorOnly, qbraidReady }: { simulatorOnly:
     return null;
   }
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-[12px] text-amber-900">
-      <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-        <div>
-          <p className="font-medium">Simulator-only mode</p>
-          <p className="mt-1 leading-5">
-            IBM hardware execution is not configured. Benchmark and optimization views stay usable, but hardware-backed runs are clearly unavailable.
-            {!qbraidReady ? " qBraid compiler-aware execution will remain degraded until qBraid and Qiskit are installed." : ""}
-          </p>
-        </div>
-      </div>
-    </div>
+    <Notice
+      tone="warn"
+      title="Simulator-only mode"
+      description={
+        !qbraidReady
+          ? "IBM hardware execution is unavailable and qBraid or Qiskit readiness is incomplete. Benchmark outputs stay honest and degraded states are labeled explicitly."
+          : "IBM hardware execution is unavailable. The workflow stays usable through simulator-backed execution and the UI labels hardware availability clearly."
+      }
+    />
   );
 }
 
@@ -140,7 +194,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/60 px-6 text-center">
-      <Sparkles className="h-6 w-6 text-qp-cyan" />
+      <AlertTriangle className="h-6 w-6 text-qp-cyan" />
       <h3 className="mt-4 text-[16px] font-semibold text-foreground">{title}</h3>
       <p className="mt-2 max-w-md text-[13px] leading-6 text-muted-foreground">{description}</p>
       {action ? <div className="mt-5">{action}</div> : null}
@@ -176,12 +230,12 @@ export function ScenarioGrid({
                 type="button"
                 onClick={() => onSelect?.(rowIndex, colIndex)}
                 className={cx(
-                  "group relative aspect-square rounded-md border transition-all",
+                  "relative aspect-square rounded-md border transition-all",
                   stateStyles[cell],
-                  editable ? "hover:-translate-y-0.5 hover:shadow-sm" : "cursor-default",
+                  editable ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-sm" : "cursor-default",
                   isSelected && "ring-2 ring-qp-cyan ring-offset-2 ring-offset-background",
                 )}
-                title={`${rowIndex},${colIndex}${brushState && editable ? ` -> ${brushState}` : ""}`}
+                title={`${rowIndex},${colIndex} - ${stateLabels[cell]}${brushState && editable ? ` -> ${stateLabels[brushState]}` : ""}`}
               >
                 {typeof score === "number" ? (
                   <span className="absolute inset-x-0 bottom-1 text-center text-[9px] font-semibold text-slate-700">
@@ -192,6 +246,14 @@ export function ScenarioGrid({
             );
           }),
         )}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {(Object.entries(stateStyles) as [CellState, string][]).map(([state, cls]) => (
+          <div key={state} className="flex items-center gap-1.5">
+            <div className={cx("h-3 w-3 rounded-sm border", cls)} />
+            <span className="text-[10px] text-muted-foreground">{stateLabels[state]}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

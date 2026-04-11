@@ -50,14 +50,24 @@ def test_core_flow_endpoints():
     risk = client.post("/api/risk/run", json={"scenario_id": scenario_id})
     assert risk.status_code == 200
     risk_id = risk.json()["id"]
+    risk_list = client.get(f"/api/risk/runs?scenario_id={scenario_id}")
+    assert risk_list.status_code == 200
+    assert any(item["id"] == risk_id for item in risk_list.json())
 
     forecast = client.post("/api/forecast/run", json={"scenario_id": scenario_id})
     assert forecast.status_code == 200
     assert len(forecast.json()["snapshots"]) >= 2
+    forecast_id = forecast.json()["id"]
+    forecast_list = client.get(f"/api/forecast/runs?scenario_id={scenario_id}")
+    assert forecast_list.status_code == 200
+    assert any(item["id"] == forecast_id for item in forecast_list.json())
 
     optimize = client.post("/api/optimize/run", json={"scenario_id": scenario_id})
     assert optimize.status_code == 200
     optimize_id = optimize.json()["id"]
+    optimize_list = client.get(f"/api/optimize/runs?scenario_id={scenario_id}")
+    assert optimize_list.status_code == 200
+    assert any(item["id"] == optimize_id for item in optimize_list.json())
 
     benchmark = client.post("/api/benchmarks/run", json={"scenario_id": scenario_id, "optimization_run_id": optimize_id})
     assert benchmark.status_code == 200
@@ -70,6 +80,9 @@ def test_core_flow_endpoints():
     )
     assert report.status_code == 200
     assert report.json()["export"]["format"] == "markdown"
+    reports = client.get(f"/api/reports?scenario_id={scenario_id}")
+    assert reports.status_code == 200
+    assert reports.json()
 
 
 def test_integrations_and_overview():

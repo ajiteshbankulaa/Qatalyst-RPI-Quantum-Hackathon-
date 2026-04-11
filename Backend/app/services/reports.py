@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import BenchmarkRun, ForecastRun, OptimizationRun, Report, RiskRun, Scenario
+
+logger = logging.getLogger(__name__)
 
 
 def latest_run(db: Session, model, scenario_id: str):
@@ -42,6 +45,21 @@ def create_report(
         "Compiler-aware benchmarking is only reported when the local environment can execute qBraid-centered runs without fabricating metrics.",
     ]
 
+    # Build benchmark detail section
+    benchmark_detail = {}
+    if benchmark_run and benchmark_run.status == "complete":
+        results = benchmark_run.results_json
+        benchmark_detail = {
+            "status": "complete",
+            "circuit_type": results.get("workload", {}).get("circuit_type", "unknown"),
+            "qiskit_version": benchmark_summary.get("qiskit_version"),
+            "qbraid_version": benchmark_summary.get("qbraid_version"),
+            "best_strategy": benchmark_summary.get("best_strategy"),
+            "best_environment": benchmark_summary.get("best_environment"),
+        }
+    elif benchmark_run:
+        benchmark_detail = {"status": benchmark_run.status, "note": "Benchmark ran in degraded or error state."}
+
     markdown = "\n".join(
         [
             f"# {title}",
@@ -55,6 +73,13 @@ def create_report(
             "## Scenario details",
             f"- Domain: {scenario.domain}",
             f"- Description: {scenario.description or 'No description provided.'}",
+            f"- Version: {scenario.version}",
+            "",
+            "## Benchmark integrity",
+            f"- Status: {benchmark_detail.get('status', 'not run')}",
+            f"- Circuit type: {benchmark_detail.get('circuit_type', 'n/a')}",
+            f"- Qiskit version: {benchmark_detail.get('qiskit_version', 'n/a')}",
+            f"- qBraid version: {benchmark_detail.get('qbraid_version', 'n/a')}",
             "",
         ]
     )
@@ -73,15 +98,17 @@ def create_report(
             "forecast": forecast_summary,
             "optimization": optimization_summary,
             "benchmark": benchmark_summary,
+            "benchmark_detail": benchmark_detail,
         },
         export_json={
             "format": "markdown",
             "content": markdown,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "filename": f"{scenario.name.lower().replace(' ', '-')}-report.md",
         },
     )
     db.add(report)
     db.commit()
     db.refresh(report)
+    logger.info("Report '%s' generated for scenario %s", title, scenario.id)
     return report

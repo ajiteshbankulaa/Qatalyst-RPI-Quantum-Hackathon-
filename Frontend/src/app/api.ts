@@ -39,6 +39,8 @@ export const api = {
   deleteScenario: (id: string) => request<{ message: string }>(`/scenarios/${id}`, { method: "DELETE" }),
   runRisk: (payload: { scenario_id: string; modes?: string[]; threshold?: number }) =>
     request<RiskRun>("/risk/run", { method: "POST", body: JSON.stringify(payload) }),
+  listRiskRuns: (scenarioId?: string) =>
+    request<RiskRun[]>(`/risk/runs${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ""}`),
   getRiskRun: (id: string) => request<RiskRun>(`/risk/runs/${id}`),
   runForecast: (payload: {
     scenario_id: string;
@@ -47,9 +49,13 @@ export const api = {
     spread_sensitivity?: number;
     wind_direction?: string;
   }) => request<ForecastRun>("/forecast/run", { method: "POST", body: JSON.stringify(payload) }),
+  listForecastRuns: (scenarioId?: string) =>
+    request<ForecastRun[]>(`/forecast/runs${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ""}`),
   getForecastRun: (id: string) => request<ForecastRun>(`/forecast/runs/${id}`),
   runOptimize: (payload: { scenario_id: string; intervention_budget_k?: number; reduced_candidate_count?: number }) =>
     request<OptimizationRun>("/optimize/run", { method: "POST", body: JSON.stringify(payload) }),
+  listOptimizeRuns: (scenarioId?: string) =>
+    request<OptimizationRun[]>(`/optimize/runs${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ""}`),
   getOptimizeRun: (id: string) => request<OptimizationRun>(`/optimize/runs/${id}`),
   runBenchmark: (payload: {
     scenario_id: string;
@@ -58,7 +64,8 @@ export const api = {
     reduced_candidate_count?: number;
     environments?: string[];
   }) => request<BenchmarkRun>("/benchmarks/run", { method: "POST", body: JSON.stringify(payload) }),
-  listBenchmarks: () => request<BenchmarkRun[]>("/benchmarks"),
+  listBenchmarks: (scenarioId?: string) =>
+    request<BenchmarkRun[]>(`/benchmarks${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ""}`),
   getBenchmark: (id: string) => request<BenchmarkRun>(`/benchmarks/${id}`),
   generateReport: (payload: {
     scenario_id: string;
@@ -68,7 +75,8 @@ export const api = {
     benchmark_run_id?: string | null;
     title?: string;
   }) => request<ReportRecord>("/reports/generate", { method: "POST", body: JSON.stringify(payload) }),
-  listReports: () => request<ReportRecord[]>("/reports"),
+  listReports: (scenarioId?: string) =>
+    request<ReportRecord[]>(`/reports${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ""}`),
   getReport: (id: string) => request<ReportRecord>(`/reports/${id}`),
   integrations: () => request<IntegrationSummary>("/integrations/status"),
 };

@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.schema_integration import IntegrationStatusResponse, IntegrationSummaryResponse
-from app.service_integrations import sync_integration_statuses
+from app.schemas.integration import IntegrationStatusResponse, IntegrationSummaryResponse
+from app.services.integrations import sync_integration_statuses
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -28,6 +28,6 @@ def get_integration_status_endpoint(db: Session = Depends(get_db)):
     return IntegrationSummaryResponse(
         simulator_only=not (hardware.available if hardware else False),
         hardware_available=hardware.available if hardware else False,
-        qbraid_ready=bool(qbraid and qbraid.details.get("sdk_installed")),
+        qbraid_ready=bool(qbraid and qbraid.details.get("installed") and qbraid.details.get("transpiler_available")),
         providers=providers,
     )

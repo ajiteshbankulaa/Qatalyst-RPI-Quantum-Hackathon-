@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import logging
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 from sqlalchemy.orm import Session
 
 from app.models import RiskRun, Scenario
-from app.schema_common import GridCellScore
-from app.service_spatial import STATE_BASE_RISK, neighbors
+from app.schemas.common import GridCellScore
+from app.services.spatial import STATE_BASE_RISK, neighbors
+
+logger = logging.getLogger(__name__)
 
 
 def _sigmoid(value: float) -> float:
@@ -119,13 +122,14 @@ def _run_mode(mode: str, grid: list[list[str]]) -> dict:
 
 def create_risk_run(db: Session, scenario: Scenario, payload: dict) -> RiskRun:
     modes = payload["modes"]
+    logger.info("Running risk analysis for scenario %s with modes %s", scenario.id, modes)
     results = {mode: _run_mode(mode, scenario.grid) for mode in modes}
     avg_by_mode = {mode: results[mode]["metrics"]["avg_score"] for mode in modes}
     practical_mode = min(avg_by_mode, key=lambda key: abs(avg_by_mode[key] - 0.55))
     summary = {
         "recommended_mode": "hybrid" if "hybrid" in modes else practical_mode,
         "most_practical_mode": practical_mode,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "comparison": [
             {
                 "mode": mode,
@@ -148,4 +152,5 @@ def create_risk_run(db: Session, scenario: Scenario, payload: dict) -> RiskRun:
     db.add(run)
     db.commit()
     db.refresh(run)
+    logger.info("Risk run %s complete", run.id)
     return run

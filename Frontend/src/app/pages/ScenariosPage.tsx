@@ -3,11 +3,12 @@ import { Link } from "react-router";
 import { Copy, Plus, Search, Trash2 } from "lucide-react";
 
 import { api } from "../api";
-import { EmptyState, LoadingState, PageHeader, SectionPanel, StatusPill } from "../components/product";
+import { EmptyState, LoadingState, Notice, PageHeader, SectionPanel, StatusPill } from "../components/product";
 import { useAsyncData } from "../useAsyncData";
 
 export function ScenariosPage() {
   const [query, setQuery] = useState("");
+  const [message, setMessage] = useState<{ tone: "success" | "error"; title: string; description: string } | null>(null);
   const { data: scenarios, loading, error, reload } = useAsyncData(api.listScenarios, []);
 
   const filtered = useMemo(() => {
@@ -17,24 +18,35 @@ export function ScenariosPage() {
   }, [query, scenarios]);
 
   async function archiveScenario(id: string) {
-    await api.updateScenario(id, { archived: true, status: "archived" });
-    await reload();
+    if (!window.confirm("Archive this scenario?")) return;
+    try {
+      await api.updateScenario(id, { archived: true, status: "archived" });
+      setMessage({ tone: "success", title: "Scenario archived", description: "The scenario remains available in history and can still be opened." });
+      await reload();
+    } catch (err) {
+      setMessage({ tone: "error", title: "Archive failed", description: err instanceof Error ? err.message : "Unknown error" });
+    }
   }
 
   async function duplicateScenario(id: string) {
     const scenario = scenarios?.find((item) => item.id === id);
     if (!scenario) return;
-    await api.createScenario({
-      name: `${scenario.name} copy`,
-      domain: scenario.domain,
-      status: "draft",
-      description: scenario.description,
-      grid: scenario.grid,
-      metadata_json: scenario.metadata_json,
-      constraints_json: scenario.constraints_json,
-      objectives_json: scenario.objectives_json,
-    });
-    await reload();
+    try {
+      await api.createScenario({
+        name: `${scenario.name} copy`,
+        domain: scenario.domain,
+        status: "draft",
+        description: scenario.description,
+        grid: scenario.grid,
+        metadata_json: scenario.metadata_json,
+        constraints_json: scenario.constraints_json,
+        objectives_json: scenario.objectives_json,
+      });
+      setMessage({ tone: "success", title: "Scenario duplicated", description: "A draft copy has been added to the library." });
+      await reload();
+    } catch (err) {
+      setMessage({ tone: "error", title: "Duplicate failed", description: err instanceof Error ? err.message : "Unknown error" });
+    }
   }
 
   if (loading) return <LoadingState label="Loading scenarios..." />;
@@ -57,7 +69,7 @@ export function ScenariosPage() {
       <PageHeader
         eyebrow="Scenario library"
         title="Persisted wildfire scenarios"
-        description="Manage reusable 10x10 constrained spatial systems. Every scenario edit is versioned so later risk, forecast, optimization, and benchmark runs can reference the exact state they used."
+        description="Manage reusable 10x10 constrained spatial systems. Every edit is versioned so later runs reference the exact scenario state they used."
         actions={
           <Link to="/app/scenarios/new" className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white">
             <span className="inline-flex items-center gap-2">
@@ -66,6 +78,8 @@ export function ScenariosPage() {
           </Link>
         }
       />
+
+      {message ? <Notice tone={message.tone} title={message.title} description={message.description} /> : null}
 
       <SectionPanel>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -82,7 +96,7 @@ export function ScenariosPage() {
         </div>
       </SectionPanel>
 
-      <SectionPanel title="Scenario records" subtitle="These rows are backed by `/api/scenarios`, not a static page-level array.">
+      <SectionPanel title="Scenario records" subtitle="Only the fields needed to run the workflow are shown here.">
         <div className="overflow-hidden rounded-2xl border border-border">
           <table className="w-full bg-white/90">
             <thead className="bg-slate-50">

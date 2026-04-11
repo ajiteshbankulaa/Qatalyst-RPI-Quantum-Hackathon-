@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.schema_common import BaseRecord, CellState
+from app.schemas.common import BaseRecord, CellState
 
 
 class ScenarioBase(BaseModel):

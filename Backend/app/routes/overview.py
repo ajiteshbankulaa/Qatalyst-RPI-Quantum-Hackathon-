@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import BenchmarkRun, ForecastRun, OptimizationRun, Report, RiskRun, Scenario
-from app.schema_common import HealthResponse
-from app.schema_overview import OverviewResponse
-from app.service_integrations import sync_integration_statuses
+from app.schemas.common import HealthResponse
+from app.schemas.overview import OverviewResponse
+from app.services.integrations import sync_integration_statuses
 
 router = APIRouter(tags=["system"])
 

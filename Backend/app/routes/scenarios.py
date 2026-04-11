@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.schema_scenario import ScenarioCreate, ScenarioResponse, ScenarioUpdate
-from app.service_scenarios import create_scenario, delete_scenario, get_scenario_or_404, list_scenarios, update_scenario
+from app.schemas.scenario import ScenarioCreate, ScenarioResponse, ScenarioUpdate
+from app.services.scenarios import create_scenario, delete_scenario, get_scenario_or_404, list_scenarios, update_scenario
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 

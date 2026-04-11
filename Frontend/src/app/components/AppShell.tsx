@@ -1,18 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 import {
   Atom,
-  Bell,
-  ChevronDown,
   Cpu,
   FileText,
   LayoutDashboard,
   Layers,
-  LogOut,
   Plug,
-  Search,
   Settings,
-  ShieldCheck,
   Target,
   TrendingUp,
   AlertTriangle,
@@ -36,7 +31,6 @@ const navItems = [
 
 export function AppShell() {
   const location = useLocation();
-  const [search, setSearch] = useState("");
   const { data: integrations } = useAsyncData(api.integrations, []);
 
   const activeLabel = useMemo(
@@ -58,19 +52,6 @@ export function AppShell() {
             </div>
           </div>
 
-          <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-white/40">Workspace</p>
-                <p className="mt-2 text-[15px] font-medium">Wildfire West</p>
-              </div>
-              <ChevronDown className="h-4 w-4 text-white/50" />
-            </div>
-            <p className="mt-3 text-[12px] leading-5 text-white/58">
-              Scenario setup, solver comparison, and compiler-aware benchmarking in one operating surface.
-            </p>
-          </div>
-
           <nav className="mt-8 space-y-1">
             {navItems.map((item) => {
               const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
@@ -89,16 +70,6 @@ export function AppShell() {
               );
             })}
           </nav>
-
-          <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-qp-cyan" />
-              <p className="text-[13px] font-medium">Execution integrity</p>
-            </div>
-            <p className="mt-2 text-[12px] leading-5 text-white/55">
-              Benchmark runs are labeled by actual availability. Hardware and qBraid capability are never inferred from placeholders.
-            </p>
-          </div>
         </aside>
 
         <div className="flex min-h-screen flex-1 flex-col">
@@ -109,31 +80,9 @@ export function AppShell() {
                 <h1 className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-foreground">{activeLabel}</h1>
               </div>
               <div className="flex flex-1 items-center gap-3 lg:justify-end">
-                <div className="flex w-full max-w-[420px] items-center gap-2 rounded-2xl border border-border bg-white px-4 py-2.5">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search scenarios or run IDs"
-                    className="w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
-                  />
-                </div>
                 {integrations ? (
                   <StatusPill label={integrations.simulator_only ? "Simulator only" : "Hardware ready"} tone={integrations.simulator_only ? "warn" : "good"} />
                 ) : null}
-                <button className="rounded-2xl border border-border bg-white p-2.5 text-muted-foreground transition-colors hover:text-foreground">
-                  <Bell className="h-4 w-4" />
-                </button>
-                <div className="hidden items-center gap-3 rounded-2xl border border-border bg-white px-3 py-2.5 md:flex">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-qp-navy text-[12px] font-semibold text-white">
-                    JD
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-medium">Jane Doe</p>
-                    <p className="text-[11px] text-muted-foreground">Platform lead</p>
-                  </div>
-                  <LogOut className="h-4 w-4 text-muted-foreground" />
-                </div>
               </div>
             </div>
           </header>
