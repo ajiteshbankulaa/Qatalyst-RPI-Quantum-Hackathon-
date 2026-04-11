@@ -215,7 +215,7 @@ export function ScenarioWorkspacePage() {
       <PageHeader
         eyebrow="Step 1 - Scenario setup"
         title={payload.name}
-        description="Edit the wildfire grid, budget constraints, and objective settings. Keep the scenario small, explicit, and versioned."
+        description="Edit the hillside, define the intervention budget, and save a clean scenario version before moving into risk mapping, spread forecasting, and intervention planning."
         actions={
           <>
             {scenarioId ? (
@@ -253,7 +253,7 @@ export function ScenarioWorkspacePage() {
       {statusMessage ? <Notice tone={statusMessage.tone} title={statusMessage.title} description={statusMessage.description} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_300px]">
-        <SectionPanel title="Controls" subtitle="Templates, metadata, and constraint inputs">
+        <SectionPanel title="Scenario inputs" subtitle="Templates, planning notes, and the minimum controls needed to set up a wildfire case">
           <div className="space-y-4 text-[13px]">
             <div>
               <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Template</label>
@@ -286,7 +286,7 @@ export function ScenarioWorkspacePage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Budget K</label>
+                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Intervention budget (K)</label>
                 <input
                   type="number"
                   min={1}
@@ -301,7 +301,7 @@ export function ScenarioWorkspacePage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Crews</label>
+                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Crew limit</label>
                 <input
                   type="number"
                   min={1}
@@ -316,7 +316,7 @@ export function ScenarioWorkspacePage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Horizon (hrs)</label>
+                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Planning horizon (hrs)</label>
                 <input
                   type="number"
                   min={1}
@@ -331,7 +331,7 @@ export function ScenarioWorkspacePage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Sensitivity</label>
+                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Spread sensitivity</label>
                 <input
                   type="number"
                   min={0}
@@ -364,11 +364,11 @@ export function ScenarioWorkspacePage() {
           </div>
         </SectionPanel>
 
-        <SectionPanel title="10x10 wildfire grid" subtitle="Choose a brush, then paint directly onto the scenario.">
+        <SectionPanel title="10x10 hillside grid" subtitle="Choose a cell type, then paint the terrain directly. This grid becomes the source of truth for every later module.">
           <ScenarioGrid grid={payload.grid} selected={selectedCell} editable onSelect={updateGridCell} brushState={brushState} />
         </SectionPanel>
 
-        <SectionPanel title="Brush and inspector" subtitle="Minimal tools for editing and checking grid cells">
+        <SectionPanel title="Cell legend and inspector" subtitle="Use the legend to mark fuel, barriers, ignition, and protected cells">
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               {CELL_OPTIONS.map((state) => (
@@ -382,6 +382,11 @@ export function ScenarioWorkspacePage() {
                   {state.replace("_", " ")}
                 </button>
               ))}
+            </div>
+            <div className="rounded-2xl border border-border bg-white/80 p-4">
+              <p className="text-[12px] leading-5 text-muted-foreground">
+                Dry brush marks highly flammable fuel, protected marks a hardened or intervention cell, ignition marks the likely fire start, and water or empty cells act as natural breaks.
+              </p>
             </div>
             <div className="rounded-2xl border border-border bg-white/80 p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Selected cell</p>
@@ -399,6 +404,9 @@ export function ScenarioWorkspacePage() {
             {scenarioId ? (
               <div className="rounded-2xl border border-border bg-white/80 p-4">
                 <p className="text-[12px] font-medium text-foreground">Next steps</p>
+                <p className="mt-1 text-[12px] text-muted-foreground">
+                  Save first, then move from risk map to spread forecast to intervention planning for this exact hillside version.
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link to={`/app/risk?scenario=${scenarioId}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
                     Risk

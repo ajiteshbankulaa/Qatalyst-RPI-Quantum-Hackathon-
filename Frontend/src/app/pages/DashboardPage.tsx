@@ -41,9 +41,9 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Portfolio"
-        title="Spatial decision intelligence command center"
-        description="Track the current wildfire scenario portfolio, latest solver runs, and whether the benchmark pipeline is operating in simulator-only or hardware-capable mode."
+        eyebrow="Command center"
+        title="Wildfire planning command center"
+        description="See which hillside scenarios are active, which modules have current evidence, and whether the benchmark record is strong enough to support a quantum-backed intervention recommendation."
         actions={
           <Link to="/app/scenarios/new" className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white">
             New scenario
@@ -52,22 +52,22 @@ export function DashboardPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricTile label="Scenarios" value={String(overview.portfolio.scenario_count)} hint={`${activeScenarios} active wildfire setups`} />
-        <MetricTile label="Risk runs" value={String(overview.portfolio.risk_runs)} hint="Classical, quantum, and hybrid comparisons" />
-        <MetricTile label="Benchmarks" value={String(overview.portfolio.benchmark_runs)} hint={`${degradedBenchmarks} degraded due to missing compiler/hardware capability`} />
-        <MetricTile label="Reports" value={String(overview.portfolio.report_count)} hint="Decision artifacts ready for export" />
+        <MetricTile label="Scenarios" value={String(overview.portfolio.scenario_count)} hint={`${activeScenarios} active hillside planning cases`} />
+        <MetricTile label="Risk maps" value={String(overview.portfolio.risk_runs)} hint="Saved classical, quantum, and hybrid comparisons" />
+        <MetricTile label="Benchmark evidence" value={String(overview.portfolio.benchmark_runs)} hint={`${degradedBenchmarks} runs still missing full compiler or hardware support`} />
+        <MetricTile label="Reports" value={String(overview.portfolio.report_count)} hint="Planner-facing decision packets ready to export" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
         <SectionPanel
-          title="Current product workflow"
-          subtitle="The platform is organized around one execution chain: scenario setup, risk scoring, propagation forecast, intervention optimization, benchmark integrity, and report output."
+          title="Current planning workflow"
+          subtitle="Every page supports the same operating sequence: define a wildfire scenario, map risk, forecast spread, place interventions, test benchmark integrity, and issue a report."
         >
           <div className="grid gap-3 md:grid-cols-3">
             {[
-              { icon: Layers, title: "Scenario setup", text: "Persisted 10x10 wildfire grids with constraints, objectives, and versioned edits.", href: "/app/scenarios" },
-              { icon: TrendingUp, title: "Risk + forecast", text: "Compare solver modes on the same scenario features and project spread pressure over time.", href: "/app/risk" },
-              { icon: Target, title: "Optimize + benchmark", text: "Pair full-grid intervention planning with reduced-subproblem quantum studies and benchmark integrity.", href: "/app/optimize" },
+              { icon: Layers, title: "Build the hillside", text: "Create or reopen a wildfire grid with an explicit intervention budget and planning horizon.", href: "/app/scenarios" },
+              { icon: TrendingUp, title: "Map risk and spread", text: "Compare solver modes on the same terrain, then project how ignition pressure may propagate over time.", href: "/app/risk" },
+              { icon: Target, title: "Plan and validate", text: "Recommend interventions, then test whether qBraid-compiled quantum workloads preserve useful behavior.", href: "/app/optimize" },
             ].map((item) => (
               <Link key={item.title} to={item.href} className="rounded-2xl border border-border bg-white/80 p-4 transition-transform hover:-translate-y-0.5">
                 <item.icon className="h-5 w-5 text-qp-cyan" />
@@ -78,18 +78,18 @@ export function DashboardPage() {
           </div>
         </SectionPanel>
 
-        <SectionPanel title="Execution posture" subtitle="Current backend capability state.">
+        <SectionPanel title="Execution posture" subtitle="Current compiler and execution readiness for this workspace.">
           <div className="space-y-3">
             <div className="rounded-2xl border border-border bg-white/80 p-4">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Quantum benchmarking</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Benchmark integrity</p>
               <div className="mt-3 flex items-center justify-between">
-                <p className="text-[15px] font-semibold">qBraid-centered pipeline</p>
+                <p className="text-[15px] font-semibold">qBraid-centered evidence pipeline</p>
                 <StatusPill label={integrations.qbraid_ready ? "SDK detected" : "Degraded"} tone={integrations.qbraid_ready ? "good" : "warn"} />
               </div>
               <p className="mt-2 text-[12px] leading-5 text-muted-foreground">
                 {integrations.qbraid_ready
                   ? "Compiler-aware benchmarking can execute when Qiskit workloads are available."
-                  : "Runs remain explicitly degraded until qBraid and Qiskit are installed locally."}
+                  : "Benchmark evidence remains explicitly degraded until qBraid and Qiskit are installed locally."}
               </p>
             </div>
 
@@ -106,7 +106,7 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
-        <SectionPanel title="Recent scenarios" subtitle="Use seeded wildfire scenarios or open the workspace to edit a new grid.">
+        <SectionPanel title="Recent scenarios" subtitle="Open a hillside case to continue the planning workflow from the exact saved version.">
           <div className="space-y-3">
             {scenarios.slice(0, 5).map((scenario) => (
               <Link
@@ -120,9 +120,7 @@ export function DashboardPage() {
                   </div>
                   <div>
                     <p className="text-[14px] font-semibold">{scenario.name}</p>
-                    <p className="mt-1 text-[12px] text-muted-foreground">
-                      v{scenario.version} • {scenario.domain} • {scenario.status}
-                    </p>
+                    <p className="mt-1 text-[12px] text-muted-foreground">v{scenario.version} • {scenario.domain} • {scenario.status}</p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -131,7 +129,7 @@ export function DashboardPage() {
           </div>
         </SectionPanel>
 
-        <SectionPanel title="Recent benchmark and report activity" subtitle="Runs are sourced from the backend, not seeded UI-only placeholders.">
+        <SectionPanel title="Recent benchmark and report activity" subtitle="Use this to check whether each scenario already has trust evidence and a reportable recommendation.">
           <div className="space-y-4">
             <div>
               <div className="mb-3 flex items-center gap-2">

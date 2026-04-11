@@ -33,6 +33,11 @@ def brute_force_best(problem: QAOAProblem) -> tuple[tuple[int, ...], float]:
     return max(evaluated, key=lambda item: item[1])
 
 
+def brute_force_worst(problem: QAOAProblem) -> tuple[tuple[int, ...], float]:
+    evaluated = [(bits, cost_of(problem, bits)) for bits in bitstrings(len(problem.weights))]
+    return min(evaluated, key=lambda item: item[1])
+
+
 def qaoa_level1(problem: QAOAProblem) -> dict:
     num_qubits = len(problem.weights)
     states = bitstrings(num_qubits)
@@ -74,9 +79,25 @@ def qaoa_level1(problem: QAOAProblem) -> dict:
 
 def approximation_ratio(problem: QAOAProblem, observed_cost: float) -> float:
     _, optimum = brute_force_best(problem)
-    if optimum == 0:
-        return 0.0
-    return round(float(observed_cost / optimum), 4)
+    _, worst = brute_force_worst(problem)
+    span = optimum - worst
+    if span == 0:
+        return 1.0
+    normalized = (observed_cost - worst) / span
+    return round(float(max(0.0, min(1.0, normalized))), 4)
+
+
+def circuit_metrics(circuit) -> dict:
+    gate_breakdown = {str(key): int(value) for key, value in dict(circuit.count_ops()).items()}
+    two_qubit_gate_count = sum(gate_breakdown.get(name, 0) for name in ("cx", "cz", "ecr"))
+    total_gates = sum(gate_breakdown.values())
+    return {
+        "depth": int(circuit.depth() or 0),
+        "width": int(circuit.num_qubits),
+        "two_qubit_gate_count": int(two_qubit_gate_count),
+        "total_gates": int(total_gates),
+        "gate_breakdown": gate_breakdown,
+    }
 
 
 def build_qaoa_circuit(problem: QAOAProblem, gamma: float, beta: float):
@@ -128,7 +149,7 @@ def parse_counts(problem: QAOAProblem, counts: dict[str, int]) -> tuple[dict[str
         probability = count / total
         parsed[raw_bits] = {
             "bits": list(bits),
-            "count": count,
+            "count": int(count),
             "probability": round(probability, 6),
             "cost": round(float(cost), 4),
         }
@@ -139,21 +160,26 @@ def parse_counts(problem: QAOAProblem, counts: dict[str, int]) -> tuple[dict[str
     return parsed, round(expected_cost, 4), round(success_probability, 4)
 
 
+def _noise_model():
+    from qiskit_aer.noise import NoiseModel, depolarizing_error
+
+    noise_model = NoiseModel()
+    noise_model.add_all_qubit_quantum_error(depolarizing_error(0.001, 1), ["rz", "sx", "x", "h", "rx"])
+    noise_model.add_all_qubit_quantum_error(depolarizing_error(0.01, 2), ["cx", "cz", "ecr"])
+    return noise_model
+
+
 def run_transpiled_qaoa(problem: QAOAProblem, circuit, shots: int) -> dict:
     if not AER_AVAILABLE:
         raise RuntimeError("qiskit-aer is not installed")
 
     from qiskit_aer import AerSimulator
-    from qiskit_aer.noise import NoiseModel, depolarizing_error
 
     ideal_backend = AerSimulator(method="automatic")
     ideal_counts = ideal_backend.run(circuit, shots=shots).result().get_counts()
 
-    noise_model = NoiseModel()
-    noise_model.add_all_qubit_quantum_error(depolarizing_error(0.001, 1), ["rz", "sx", "x", "h", "rx"])
-    noise_model.add_all_qubit_quantum_error(depolarizing_error(0.01, 2), ["cx", "cz", "ecr"])
     noisy_backend = AerSimulator(method="density_matrix")
-    noisy_counts = noisy_backend.run(circuit, shots=shots, noise_model=noise_model).result().get_counts()
+    noisy_counts = noisy_backend.run(circuit, shots=shots, noise_model=_noise_model()).result().get_counts()
 
     ideal_parsed, ideal_expected, ideal_success = parse_counts(problem, ideal_counts)
     noisy_parsed, noisy_expected, noisy_success = parse_counts(problem, noisy_counts)
@@ -174,4 +200,3 @@ def run_transpiled_qaoa(problem: QAOAProblem, circuit, shots: int) -> dict:
             "noise_model": "depolarizing (1Q 0.1%, 2Q 1.0%)",
         },
     }
-

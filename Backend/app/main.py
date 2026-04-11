@@ -32,7 +32,7 @@ logger = logging.getLogger("quantumproj")
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        description="Spatial decision intelligence platform with compiler-aware quantum benchmarking",
+        description="Wildfire resilience planning backend with ignition risk classification, spread forecasting, intervention optimization, and qBraid-centered benchmark validation.",
         version="0.2.0",
     )
 

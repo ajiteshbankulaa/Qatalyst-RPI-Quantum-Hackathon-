@@ -34,15 +34,16 @@ export function BenchmarksPage() {
     }
   }, [benchmarks, latestRun]);
 
-  const scatterData =
-    (latestRun?.results?.strategy_results as Array<any> | undefined)?.map((item) => ({
-      x: item.compiled_metrics.depth,
-      y: Number(((item.output_quality.approximation_ratio ?? 0) * 100).toFixed(1)),
-      label: item.strategy_label ?? item.strategy,
-      environment: item.environment,
-      gates: item.compiled_metrics.total_gates,
-      twoQ: item.compiled_metrics.two_qubit_gate_count,
-    })) ?? [];
+  const strategyResults = (latestRun?.results?.strategy_results as Array<any> | undefined) ?? [];
+  const scatterData = strategyResults.map((item) => ({
+    x: item.compiled_metrics.depth,
+    y: Number(((item.output_quality.approximation_ratio ?? 0) * 100).toFixed(1)),
+    label: item.strategy_label ?? item.strategy?.label ?? item.strategy_key,
+    environment: item.environment,
+    gates: item.compiled_metrics.total_gates,
+    twoQ: item.compiled_metrics.two_qubit_gate_count,
+    success: Number(((item.output_quality.success_probability ?? 0) * 100).toFixed(1)),
+  }));
 
   async function execute() {
     if (!activeScenarioId) return;
@@ -73,12 +74,17 @@ export function BenchmarksPage() {
     return <EmptyState title="Benchmark workspace unavailable" description={scenariosError ?? "Could not load benchmark data."} />;
   }
 
+  const workload = latestRun?.results?.workload;
+  const strategies = (latestRun?.results?.strategies as Array<any> | undefined) ?? [];
+  const environments = (latestRun?.results?.executed_environments as string[] | undefined) ?? (latestRun?.results?.environments as string[] | undefined) ?? [];
+  const environmentSummary = latestRun?.results?.environment_summary ?? {};
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Step 5 - Benchmarks"
-        title="Compiler-aware benchmarking"
-        description="Benchmark the reduced intervention workload through qBraid-centered compilation strategies and compare output quality against compiled cost."
+        title="Benchmark integrity"
+        description="Study how the reduced wildfire intervention QAOA workload survives qBraid-centered compilation across strategies and execution environments."
         actions={
           <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-50">
             {running ? "Running benchmark..." : "Run benchmark"}
@@ -113,12 +119,42 @@ export function BenchmarksPage() {
           {latestRun ? (
             <>
               <div className="grid gap-4 md:grid-cols-3">
-                <MetricTile label="Run status" value={latestRun.status} hint={`Run ${latestRun.id.slice(0, 8)}`} />
-                <MetricTile label="Best strategy" value={latestRun.summary?.best_strategy ?? "n/a"} hint={latestRun.summary?.best_environment ?? "No best environment recorded"} />
-                <MetricTile label="Recommendation" value={latestRun.summary?.recommended_mode ?? latestRun.summary?.recommendation ?? "n/a"} hint={latestRun.availability?.mode ?? "unknown availability"} />
+                <MetricTile label="Algorithm" value={latestRun.summary?.algorithm ?? workload?.algorithm ?? "QAOA"} hint={workload?.source_representation ?? latestRun.summary?.source_representation ?? "qiskit.QuantumCircuit"} />
+                <MetricTile label="Best tradeoff" value={latestRun.summary?.best_strategy_label ?? latestRun.summary?.best_strategy ?? "n/a"} hint={latestRun.summary?.best_environment ?? "No best environment recorded"} />
+                <MetricTile label="Conclusion" value={latestRun.status} hint={latestRun.summary?.recommendation ?? "No conclusion available"} />
               </div>
 
-              <SectionPanel title="Quality vs cost" subtitle="Lower depth is cheaper. Higher approximation ratio is better. Marker size reflects total gate count.">
+              {workload ? (
+                <SectionPanel title="Benchmark study design" subtitle="What is being benchmarked and why it matters to wildfire planning">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricTile label="Workload" value={workload.algorithm ?? "QAOA"} hint={workload.name ?? "Reduced intervention workload"} />
+                    <MetricTile label="Source representation" value={workload.source_representation ?? "qiskit.QuantumCircuit"} hint="Framework-level source before qBraid transformation" />
+                    <MetricTile label="Strategies" value={String(strategies.length)} hint={strategies.map((item) => item.intermediate_representation).join(" vs ")} />
+                    <MetricTile label="Environments" value={String(environments.length)} hint={environments.join(", ")} />
+                  </div>
+                  <p className="mt-4 text-[13px] leading-6 text-muted-foreground">{workload.wildfire_relevance}</p>
+                </SectionPanel>
+              ) : null}
+
+              {strategies.length > 0 ? (
+                <SectionPanel title="Compared qBraid strategies" subtitle="The benchmark compares distinct qBraid transformation and target-preparation choices">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {strategies.map((strategy) => (
+                      <div key={strategy.id} className="rounded-2xl border border-border bg-white/80 p-4">
+                        <p className="text-[14px] font-semibold">{strategy.label}</p>
+                        <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{strategy.description}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <StatusPill label={strategy.intermediate_representation} tone="accent" />
+                          <StatusPill label={strategy.compile_profile} tone="neutral" />
+                          <StatusPill label={strategy.coupling_profile} tone="neutral" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </SectionPanel>
+              ) : null}
+
+              <SectionPanel title="Quality vs cost" subtitle="Lower depth is cheaper, higher approximation ratio is better, and marker size reflects total gate count.">
                 {latestRun.status === "complete" && scatterData.length > 0 ? (
                   <div className="space-y-4">
                     <div className="h-[320px]">
@@ -139,6 +175,7 @@ export function BenchmarksPage() {
                                   <p className="text-muted-foreground">{d.environment}</p>
                                   <p className="mt-1">Depth: {d.x} • Approx. ratio: {d.y}%</p>
                                   <p>Total gates: {d.gates} • 2Q gates: {d.twoQ}</p>
+                                  <p>Success probability: {d.success}%</p>
                                 </div>
                               );
                             }}
@@ -154,20 +191,22 @@ export function BenchmarksPage() {
                             <th className="px-4 py-3">Strategy</th>
                             <th className="px-4 py-3">Environment</th>
                             <th className="px-4 py-3 text-right">Depth</th>
-                            <th className="px-4 py-3 text-right">2Q gates</th>
-                            <th className="px-4 py-3 text-right">Approx. ratio</th>
+                            <th className="px-4 py-3 text-right">2Q</th>
+                            <th className="px-4 py-3 text-right">Total</th>
+                            <th className="px-4 py-3 text-right">Approx.</th>
+                            <th className="px-4 py-3 text-right">Success</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(latestRun.results?.strategy_results as Array<any>).map((item, index) => (
-                            <tr key={`${item.strategy}-${item.environment}-${index}`} className="border-t border-border">
-                              <td className="px-4 py-3 font-medium">{item.strategy_label ?? item.strategy}</td>
+                          {strategyResults.map((item, index) => (
+                            <tr key={`${item.strategy_key}-${item.environment}-${index}`} className="border-t border-border">
+                              <td className="px-4 py-3 font-medium">{item.strategy_label ?? item.strategy?.label ?? item.strategy_key}</td>
                               <td className="px-4 py-3 text-muted-foreground">{item.environment}</td>
                               <td className="px-4 py-3 text-right font-mono">{item.compiled_metrics.depth}</td>
                               <td className="px-4 py-3 text-right font-mono">{item.compiled_metrics.two_qubit_gate_count}</td>
-                              <td className="px-4 py-3 text-right font-mono">
-                                {item.output_quality?.approximation_ratio != null ? `${(item.output_quality.approximation_ratio * 100).toFixed(1)}%` : "n/a"}
-                              </td>
+                              <td className="px-4 py-3 text-right font-mono">{item.compiled_metrics.total_gates}</td>
+                              <td className="px-4 py-3 text-right font-mono">{`${(item.output_quality.approximation_ratio * 100).toFixed(1)}%`}</td>
+                              <td className="px-4 py-3 text-right font-mono">{`${(item.output_quality.success_probability * 100).toFixed(1)}%`}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -178,6 +217,24 @@ export function BenchmarksPage() {
                   <Notice tone="warn" title="Compiled benchmark results unavailable" description={latestRun.results?.note ?? "This run did not produce a complete strategy comparison."} />
                 )}
               </SectionPanel>
+
+              {Object.keys(environmentSummary).length > 0 ? (
+                <SectionPanel title="Environment-by-environment outcome" subtitle="This is where the benchmark decides which strategy held up best under each execution context">
+                  <div className="grid gap-4 lg:grid-cols-3">
+                    {Object.entries(environmentSummary).map(([environment, summary]) => (
+                      <div key={environment} className="rounded-2xl border border-border bg-white/80 p-4">
+                        <p className="text-[14px] font-semibold">{environment}</p>
+                        <p className="mt-3 text-[12px] text-muted-foreground">Quality leader</p>
+                        <p className="text-[13px] font-medium">{String((summary as any).quality_winner?.strategy_label ?? "n/a")}</p>
+                        <p className="mt-2 text-[12px] text-muted-foreground">Cost leader</p>
+                        <p className="text-[13px] font-medium">{String((summary as any).cost_winner?.strategy_label ?? "n/a")}</p>
+                        <p className="mt-2 text-[12px] text-muted-foreground">Best tradeoff</p>
+                        <p className="text-[13px] font-medium">{String((summary as any).tradeoff_winner?.strategy_label ?? "n/a")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </SectionPanel>
+              ) : null}
 
               <SectionPanel title="Continue workflow" subtitle="Use this run in reporting or inspect the full benchmark detail.">
                 <div className="flex flex-wrap gap-2">
@@ -192,13 +249,13 @@ export function BenchmarksPage() {
             </>
           ) : (
             <EmptyState
-              title="No benchmark run yet"
-              description="Run a benchmark to compare compilation strategy quality against compiled resource cost for the reduced intervention workload."
+              title="No benchmark evidence yet"
+              description="Run benchmark integrity to compare qBraid compilation strategies, execution environments, and the cost of preserving useful optimization behavior."
             />
           )}
         </div>
 
-        <SectionPanel title="Run history" subtitle="Persisted benchmark records for this scenario">
+        <SectionPanel title="Benchmark history" subtitle="Saved benchmark evidence for this scenario">
           <div className="space-y-3">
             {benchmarks.length === 0 ? (
               <p className="text-[12px] text-muted-foreground">No benchmark runs saved for this scenario yet.</p>

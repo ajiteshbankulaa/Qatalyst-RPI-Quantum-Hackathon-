@@ -19,7 +19,7 @@ export function SettingsPage() {
       <PageHeader
         eyebrow="Settings"
         title="Workspace settings"
-        description="MVP settings are intentionally narrow: service health, execution posture, and workspace operating assumptions. Storage remains SQLite-backed with a clean migration path to PostgreSQL."
+        description="Settings stay intentionally narrow in the MVP: service health, execution posture, and operating assumptions for the wildfire planning workspace."
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -32,10 +32,10 @@ export function SettingsPage() {
 
         <SectionPanel title="Execution defaults" subtitle="Current runtime behavior for this workspace">
           <ul className="space-y-3 text-[13px] text-muted-foreground">
-            <li>Primary wedge: wildfire resilience on 10x10 editable grids.</li>
+            <li>Primary wedge: wildfire resilience planning on 10x10 editable hillsides.</li>
             <li>Persistence: SQLite with typed API contracts and modular services.</li>
             <li>Fallback policy: simulator-only mode when IBM credentials are missing.</li>
-            <li>Benchmark policy: qBraid-centered execution integrity only when actual capability exists.</li>
+            <li>Benchmark policy: qBraid-centered benchmark integrity only when actual capability exists.</li>
           </ul>
         </SectionPanel>
       </div>

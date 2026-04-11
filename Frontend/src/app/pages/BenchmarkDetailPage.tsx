@@ -13,8 +13,15 @@ export function BenchmarkDetailPage() {
   if (error || !run) return <EmptyState title="Benchmark run unavailable" description={error ?? "Run not found."} />;
 
   const workload = run.results?.workload;
-  const strategyResults = run.results?.strategy_results as Array<any> | undefined;
-  const simExecution = run.results?.simulator_execution;
+  const strategies = (run.results?.strategies as Array<any> | undefined) ?? [];
+  const strategyResults = (run.results?.strategy_results as Array<any> | undefined) ?? [];
+  const environmentSummary = run.results?.environment_summary ?? {};
+  const firstResultByStrategy = new Map<string, any>();
+  for (const result of strategyResults) {
+    if (!firstResultByStrategy.has(result.strategy_key)) {
+      firstResultByStrategy.set(result.strategy_key, result);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -24,15 +31,16 @@ export function BenchmarkDetailPage() {
 
       <PageHeader
         eyebrow="Benchmark detail"
-        title="Compiler-aware benchmark run"
-        description={run.summary?.recommendation ?? "Inspect workload scope, compiler strategy outputs, and simulator results."}
+        title="Benchmark integrity run"
+        description={run.summary?.recommendation ?? "Inspect the workload, qBraid transformations, execution environments, and the quality-cost tradeoff."}
       />
 
       <SectionPanel>
         <div className="flex flex-wrap items-center gap-3">
           <StatusPill label={run.status} tone={run.status === "complete" ? "good" : "warn"} />
           <StatusPill label={run.availability?.mode ?? "unknown"} tone={run.availability?.mode === "ready" ? "good" : "warn"} />
-          {run.summary?.circuit_type ? <StatusPill label={run.summary.circuit_type} tone="accent" /> : null}
+          {run.summary?.algorithm ? <StatusPill label={run.summary.algorithm} tone="accent" /> : null}
+          {run.summary?.source_representation ? <StatusPill label={run.summary.source_representation} /> : null}
           {run.summary?.qiskit_version ? <StatusPill label={`Qiskit ${run.summary.qiskit_version}`} /> : null}
           {run.summary?.qbraid_version ? <StatusPill label={`qBraid ${run.summary.qbraid_version}`} /> : null}
         </div>
@@ -47,44 +55,94 @@ export function BenchmarkDetailPage() {
       ) : null}
 
       {workload ? (
-        <SectionPanel title="Workload" subtitle="Reduced intervention QAOA subproblem derived from the scenario grid">
+        <SectionPanel title="What algorithm was run?" subtitle="This section makes the workload and its product relevance explicit">
           <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-            <MetricTile label="Problem" value={workload.name ?? "QAOA"} />
+            <MetricTile label="Algorithm" value={workload.algorithm ?? "QAOA"} />
+            <MetricTile label="Source framework" value={workload.source_representation ?? "qiskit.QuantumCircuit"} />
             <MetricTile label="Qubits" value={String(workload.problem_size?.num_qubits ?? workload.uncompiled_circuit?.width ?? "n/a")} />
             <MetricTile label="Raw depth" value={String(workload.uncompiled_circuit?.depth ?? "n/a")} />
             <MetricTile label="Raw 2Q gates" value={String(workload.uncompiled_circuit?.two_qubit_gate_count ?? "n/a")} />
-            <MetricTile label="Best known cost" value={String(workload.best_known_cost ?? workload.exact_reference_cost ?? "n/a")} />
-            <MetricTile label="QAOA expected cost" value={String(workload.qaoa_analytical_reference?.expected_cost ?? workload.qaoa_reference?.expected_cost ?? "n/a")} />
+            <MetricTile label="Exact best cost" value={String(workload.exact_reference?.best_cost ?? "n/a")} />
+          </div>
+          <div className="mt-4 space-y-3 text-[13px] leading-6 text-muted-foreground">
+            <p>{workload.objective}</p>
+            <p>{workload.wildfire_relevance}</p>
+            <p>{workload.benchmark_question}</p>
           </div>
         </SectionPanel>
       ) : null}
 
-      {strategyResults && strategyResults.length > 0 ? (
-        <SectionPanel title="Strategy comparison" subtitle="Compiled resource metrics and output quality across strategies and environments">
+      {strategies.length > 0 ? (
+        <SectionPanel title="How did qBraid transform it?" subtitle="Each strategy changes the intermediate representation and target-preparation profile">
+          <div className="grid gap-4 lg:grid-cols-2">
+            {strategies.map((strategy) => (
+              <div key={strategy.id} className="rounded-2xl border border-border bg-white/80 p-4">
+                <p className="text-[14px] font-semibold">{strategy.label}</p>
+                <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{strategy.description}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <StatusPill label={strategy.intermediate_representation} tone="accent" />
+                  <StatusPill label={strategy.compile_profile} tone="neutral" />
+                  <StatusPill label={strategy.coupling_profile} tone="neutral" />
+                </div>
+                {firstResultByStrategy.get(strategy.id)?.strategy?.qbraid_transform ? (
+                  <div className="mt-4 rounded-xl border border-border bg-slate-50/80 p-3 text-[11px] leading-5 text-muted-foreground">
+                    <p className="font-medium text-foreground">qBraid conversion path</p>
+                    <p>Forward: {(firstResultByStrategy.get(strategy.id).strategy.qbraid_transform.forward_path ?? []).join(" -> ")}</p>
+                    <p>Reverse: {(firstResultByStrategy.get(strategy.id).strategy.qbraid_transform.reverse_path ?? []).join(" -> ")}</p>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </SectionPanel>
+      ) : null}
+
+      {Object.keys(environmentSummary).length > 0 ? (
+        <SectionPanel title="Which preserved useful performance best?" subtitle="Environment summaries compare quality winners, cost winners, and best tradeoff winners">
+          <div className="grid gap-4 lg:grid-cols-3">
+            {Object.entries(environmentSummary).map(([environment, summary]) => (
+              <div key={environment} className="rounded-2xl border border-border bg-white/80 p-4">
+                <p className="text-[14px] font-semibold">{environment}</p>
+                <p className="mt-3 text-[12px] text-muted-foreground">Quality leader</p>
+                <p className="text-[13px] font-medium">{String((summary as any).quality_winner?.strategy_label ?? "n/a")}</p>
+                <p className="mt-2 text-[12px] text-muted-foreground">Cost leader</p>
+                <p className="text-[13px] font-medium">{String((summary as any).cost_winner?.strategy_label ?? "n/a")}</p>
+                <p className="mt-2 text-[12px] text-muted-foreground">Best tradeoff</p>
+                <p className="text-[13px] font-medium">{String((summary as any).tradeoff_winner?.strategy_label ?? "n/a")}</p>
+              </div>
+            ))}
+          </div>
+        </SectionPanel>
+      ) : null}
+
+      {strategyResults.length > 0 ? (
+        <SectionPanel title="What was the cost in compiled resources?" subtitle="Every row combines qBraid strategy, execution environment, output quality, and compiled cost">
           <div className="overflow-hidden rounded-xl border border-border">
             <table className="w-full bg-white/90 text-[12px]">
               <thead className="bg-slate-50">
                 <tr className="text-left text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
                   <th className="px-4 py-3">Strategy</th>
+                  <th className="px-4 py-3">Intermediate</th>
                   <th className="px-4 py-3">Environment</th>
                   <th className="px-4 py-3 text-right">Depth</th>
                   <th className="px-4 py-3 text-right">2Q gates</th>
                   <th className="px-4 py-3 text-right">Total gates</th>
-                  <th className="px-4 py-3 text-right">Approx. ratio</th>
-                  <th className="px-4 py-3 text-right">Success prob.</th>
+                  <th className="px-4 py-3 text-right">Approx.</th>
+                  <th className="px-4 py-3 text-right">Success</th>
                 </tr>
               </thead>
               <tbody>
                 {strategyResults.map((result: any, idx: number) => {
-                  const isBest = result.strategy === run.results?.best_strategy && result.environment === run.results?.best_environment;
+                  const isBest = result.strategy_key === run.summary?.best_strategy && result.environment === run.summary?.best_environment;
                   return (
                     <tr key={idx} className={`border-t border-border ${isBest ? "bg-cyan-50/50" : ""}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{result.strategy_label ?? result.strategy}</span>
+                          <span className="font-medium">{result.strategy_label ?? result.strategy?.label ?? result.strategy_key}</span>
                           {isBest ? <StatusPill label="Best" tone="good" /> : null}
                         </div>
                       </td>
+                      <td className="px-4 py-3 text-muted-foreground">{result.strategy?.intermediate_representation ?? "-"}</td>
                       <td className="px-4 py-3 text-muted-foreground">{result.environment}</td>
                       <td className="px-4 py-3 text-right font-mono">{result.compiled_metrics?.depth ?? "-"}</td>
                       <td className="px-4 py-3 text-right font-mono">{result.compiled_metrics?.two_qubit_gate_count ?? "-"}</td>
@@ -104,37 +162,23 @@ export function BenchmarkDetailPage() {
         </SectionPanel>
       ) : null}
 
-      {simExecution ? (
-        <SectionPanel title="Simulator results" subtitle="Qiskit Aer execution on ideal and noisy simulator targets">
+      {strategyResults.some((item: any) => item.artifacts?.job_id) ? (
+        <SectionPanel title="Hardware artifacts" subtitle="IBM Runtime metadata is shown only when hardware execution actually occurred">
           <div className="grid gap-4 lg:grid-cols-2">
-            {simExecution.ideal_simulator ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/30 p-4">
-                <p className="text-[13px] font-semibold text-foreground">Ideal simulator</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <MetricTile label="Expected cost" value={String(simExecution.ideal_simulator.expected_cost)} />
-                  <MetricTile label="Approx. ratio" value={`${(simExecution.ideal_simulator.approximation_ratio * 100).toFixed(1)}%`} />
-                  <MetricTile label="Success prob." value={`${(simExecution.ideal_simulator.success_probability * 100).toFixed(1)}%`} />
-                  <MetricTile label="Outcomes" value={String(simExecution.ideal_simulator.unique_outcomes)} />
+            {strategyResults
+              .filter((item: any) => item.artifacts?.job_id)
+              .map((item: any) => (
+                <div key={`${item.strategy_key}-${item.environment}`} className="rounded-2xl border border-border bg-white/80 p-4">
+                  <p className="text-[14px] font-semibold">{item.strategy_label}</p>
+                  <p className="mt-2 text-[12px] text-muted-foreground">Backend: {item.execution_notes?.target_backend ?? "n/a"}</p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">Job ID: {item.artifacts?.job_id}</p>
                 </div>
-              </div>
-            ) : null}
-            {simExecution.noisy_simulator ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/30 p-4">
-                <p className="text-[13px] font-semibold text-foreground">Noisy simulator</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">{simExecution.noisy_simulator.noise_model}</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <MetricTile label="Expected cost" value={String(simExecution.noisy_simulator.expected_cost)} />
-                  <MetricTile label="Approx. ratio" value={`${(simExecution.noisy_simulator.approximation_ratio * 100).toFixed(1)}%`} />
-                  <MetricTile label="Success prob." value={`${(simExecution.noisy_simulator.success_probability * 100).toFixed(1)}%`} />
-                  <MetricTile label="Outcomes" value={String(simExecution.noisy_simulator.unique_outcomes)} />
-                </div>
-              </div>
-            ) : null}
+              ))}
           </div>
         </SectionPanel>
       ) : null}
 
-      <SectionPanel title="Continue workflow" subtitle="Use this benchmark in the final decision report.">
+      <SectionPanel title="Continue workflow" subtitle="Use this benchmark record as evidence in the final wildfire planning report.">
         <div className="flex flex-wrap gap-2">
           <Link to={`/app/reports?scenario=${run.scenario_id}&benchmark=${run.id}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
             Report with this run

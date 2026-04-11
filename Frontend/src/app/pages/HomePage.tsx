@@ -12,7 +12,7 @@ export function HomePage() {
             </div>
             <div>
               <p className="text-[15px] font-semibold tracking-[-0.02em]">QuantumProj</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Spatial decision intelligence</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Wildfire resilience planning</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -30,12 +30,12 @@ export function HomePage() {
         <section className="px-6 py-20">
           <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div className="max-w-xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-qp-cyan">Wildfire resilience first</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-qp-cyan">For wildfire planning teams</p>
               <h1 className="mt-4 text-[46px] font-semibold tracking-[-0.05em] text-foreground">
-                Model risk, forecast spread, optimize interventions, and benchmark solver integrity.
+                Plan wildfire interventions with risk maps, spread forecasts, and benchmark-backed quantum evidence.
               </h1>
               <p className="mt-5 text-[16px] leading-8 text-muted-foreground">
-                QuantumProj is a real decision platform for constrained spatial systems. It starts with wildfire grids, couples operational planning to solver comparison, and keeps qBraid central to the trust story for quantum recommendations.
+                QuantumProj helps resilience analysts, land managers, and research teams work through one clear flow on a 10x10 hillside grid: define the fire-prone terrain, score local risk, simulate spread, place limited fire-resistant interventions, and verify that the quantum optimization workflow still behaves well after qBraid-centered compilation.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link to="/app" className="inline-flex items-center gap-2 rounded-2xl bg-qp-navy px-5 py-3 text-[14px] font-medium text-white">
@@ -66,9 +66,9 @@ export function HomePage() {
               </div>
               <div className="absolute inset-x-8 bottom-8 grid gap-3 md:grid-cols-3">
                 {[
-                  { label: "Risk modeling", value: "Classical / Quantum / Hybrid" },
-                  { label: "Optimization scope", value: "Full grid + reduced quantum study" },
-                  { label: "Benchmark posture", value: "Compiler-aware with degraded fallback" },
+                  { label: "Risk map", value: "Classical, quantum, and hybrid scoring on one hillside" },
+                  { label: "Intervention plan", value: "Full-grid baseline plus reduced quantum study" },
+                  { label: "Benchmark integrity", value: "qBraid-centered compilation across simulators and IBM" },
                 ].map((item) => (
                   <div key={item.label} className="rounded-2xl border border-white/10 bg-white/6 p-4 text-white">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-white/50">{item.label}</p>
@@ -83,10 +83,10 @@ export function HomePage() {
         <section className="px-6 pb-20">
           <div className="mx-auto grid max-w-7xl gap-6 md:grid-cols-4">
             {[
-              { icon: Layers, title: "Scenario setup", text: "Editable 10x10 wildfire grids, metadata, constraints, objectives, and versioned runs." },
-              { icon: TrendingUp, title: "Forecast", text: "Time-step spread simulation with dryness, wind direction, and sensitivity controls." },
-              { icon: Target, title: "Optimize", text: "Budget-constrained intervention placement with full-scale classical and reduced quantum study." },
-              { icon: Cpu, title: "Benchmarks", text: "qBraid-centered execution integrity analysis across compilation strategies and targets." },
+              { icon: Layers, title: "Build the hillside scenario", text: "Edit a 10x10 wildfire grid, set the intervention budget, and save a versioned planning case." },
+              { icon: TrendingUp, title: "Forecast spread pressure", text: "Project fire propagation under explicit dryness, wind, and sensitivity assumptions." },
+              { icon: Target, title: "Place limited interventions", text: "Recommend where scarce fire-resistant actions should go to break likely spread paths." },
+              { icon: Cpu, title: "Validate benchmark integrity", text: "Use qBraid-centered benchmarking to test whether compiled quantum workloads still preserve useful optimization behavior." },
             ].map((item) => (
               <div key={item.title} className="rounded-3xl border border-border bg-white/80 p-6">
                 <item.icon className="h-5 w-5 text-qp-cyan" />
@@ -101,17 +101,17 @@ export function HomePage() {
           <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="rounded-[28px] border border-border bg-white/85 p-8">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-qp-violet">Why qBraid is central</p>
-              <h2 className="mt-3 text-[28px] font-semibold tracking-[-0.04em]">Benchmark trust comes from execution integrity, not decoration.</h2>
+              <h2 className="mt-3 text-[28px] font-semibold tracking-[-0.04em]">The benchmark layer exists to answer one practical question: can this quantum recommendation be trusted after compilation?</h2>
               <p className="mt-4 text-[14px] leading-7 text-muted-foreground">
-                Quantum recommendations are only useful if the workload survives compilation and realistic execution constraints. QuantumProj uses qBraid as the backbone of its benchmark story so teams can compare strategy quality against compiled resource cost without pretending hardware success where it does not exist.
+                Quantum recommendations are not useful if they only look good before compilation. QuantumProj keeps qBraid in the center of the workflow so teams can compare strategy quality against compiled resource cost, then see whether the reduced wildfire intervention workload still behaves well on simulators and available IBM hardware.
               </p>
             </div>
             <div className="rounded-[28px] border border-border bg-qp-navy p-8 text-white">
               <div className="grid gap-4 md:grid-cols-2">
                 {[
-                  "Reduced intervention QAOA workload tied to product optimization",
-                  "Strategy A vs strategy B comparison",
-                  "Ideal simulator, noisy simulator, and optional IBM execution",
+                  "Reduced wildfire-intervention QAOA workload tied directly to the planning module",
+                  "Two qBraid compilation strategies compared side by side",
+                  "Ideal simulator, noisy simulator, and IBM execution when available",
                   "Approximation ratio, success probability, depth, width, and 2Q gate tracking",
                 ].map((line) => (
                   <div key={line} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-[13px] leading-6 text-white/78">
@@ -126,7 +126,7 @@ export function HomePage() {
         <section className="border-y border-border bg-white/80 px-6 py-10">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-8 text-[13px] text-muted-foreground">
             <span className="inline-flex items-center gap-2">
-              <Flame className="h-4 w-4 text-qp-amber" /> Wildfire resilience
+              <Flame className="h-4 w-4 text-qp-amber" /> Wildfire resilience planning
             </span>
             <span className="inline-flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-emerald-500" /> Honest degraded mode when hardware is unavailable

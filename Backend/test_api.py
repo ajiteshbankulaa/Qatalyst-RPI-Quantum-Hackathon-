@@ -47,9 +47,13 @@ def test_scenario_crud():
 def test_core_flow_endpoints():
     scenario_id = _first_scenario_id()
 
-    risk = client.post("/api/risk/run", json={"scenario_id": scenario_id})
+    risk = client.post("/api/risk/run", json={"scenario_id": scenario_id, "horizon_steps": 2, "sample_count": 12})
     assert risk.status_code == 200
     risk_id = risk.json()["id"]
+    assert risk.json()["summary"]["classification_task"]
+    assert risk.json()["summary"]["dataset"]["feature_names"]
+    assert risk.json()["results"]["classical"]["model"]["family"] == "logistic_regression"
+    assert risk.json()["results"]["quantum"]["model"]["family"] == "variational_quantum_classifier"
     risk_list = client.get(f"/api/risk/runs?scenario_id={scenario_id}")
     assert risk_list.status_code == 200
     assert any(item["id"] == risk_id for item in risk_list.json())
@@ -69,10 +73,18 @@ def test_core_flow_endpoints():
     assert optimize_list.status_code == 200
     assert any(item["id"] == optimize_id for item in optimize_list.json())
 
-    benchmark = client.post("/api/benchmarks/run", json={"scenario_id": scenario_id, "optimization_run_id": optimize_id})
+    benchmark = client.post(
+        "/api/benchmarks/run",
+        json={"scenario_id": scenario_id, "optimization_run_id": optimize_id, "environments": ["ideal_simulator", "noisy_simulator"]},
+    )
     assert benchmark.status_code == 200
     benchmark_id = benchmark.json()["id"]
     assert benchmark.json()["availability"]["mode"] in {"ready", "degraded"}
+    if benchmark.json()["status"] == "complete":
+        strategy_results = benchmark.json()["results"]["strategy_results"]
+        assert len(strategy_results) >= 4
+        assert "total_gates" in strategy_results[0]["compiled_metrics"]
+        assert "success_probability" in strategy_results[0]["output_quality"]
 
     report = client.post(
         "/api/reports/generate",

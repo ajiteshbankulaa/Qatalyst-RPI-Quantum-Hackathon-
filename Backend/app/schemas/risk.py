@@ -8,7 +8,10 @@ from pydantic import BaseModel, Field
 class RiskRunCreate(BaseModel):
     scenario_id: str
     modes: list[str] = Field(default_factory=lambda: ["classical", "quantum", "hybrid"])
-    threshold: float = 0.62
+    threshold: float = 0.5
+    horizon_steps: int = Field(default=2, ge=2, le=8)
+    sample_count: int = Field(default=24, ge=8, le=64)
+    seed: int = 17
 
 
 class RiskRunResponse(BaseModel):

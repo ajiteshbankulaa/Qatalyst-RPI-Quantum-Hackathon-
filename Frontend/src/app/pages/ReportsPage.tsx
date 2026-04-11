@@ -113,7 +113,7 @@ export function ReportsPage() {
       <PageHeader
         eyebrow="Step 6 - Reports"
         title="Decision reports"
-        description="Assemble a decision artifact from explicit scenario-linked runs. If a run selector is left blank, the backend falls back to the latest run for that module."
+        description="Assemble a wildfire planning brief from explicit scenario-linked runs so planners and research teams can review one coherent recommendation trail."
         actions={
           <button onClick={() => void generate()} disabled={running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-50">
             {running ? "Generating..." : "Generate report"}
@@ -123,7 +123,7 @@ export function ReportsPage() {
 
       {message ? <Notice tone={message.tone} title={message.title} description={message.description} /> : null}
 
-      <SectionPanel title="Report inputs" subtitle="Choose a scenario and the exact runs you want included">
+      <SectionPanel title="Report inputs" subtitle="Choose the scenario and exact evidence you want included in the decision brief">
         <div className="grid gap-4 lg:grid-cols-5">
           <Selector label="Scenario" value={activeScenarioId} onChange={setScenarioId} options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))} />
           <Selector label="Risk run" value={riskRunId} onChange={setRiskRunId} allowLatest options={riskRuns.map((run) => ({ value: run.id, label: `${run.id.slice(0, 8)} • ${new Date(run.created_at).toLocaleString()}` }))} />
@@ -134,7 +134,7 @@ export function ReportsPage() {
       </SectionPanel>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <SectionPanel title="Saved reports" subtitle="Persisted report records for the selected scenario">
+        <SectionPanel title="Saved reports" subtitle="Previously generated planning briefs for the selected scenario">
           <div className="space-y-3">
             {reports.length === 0 ? (
               <p className="py-4 text-center text-[13px] text-muted-foreground">No reports generated yet for this scenario.</p>
@@ -182,19 +182,15 @@ export function ReportsPage() {
               {sections ? (
                 <div className="space-y-4">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <SummaryCard label="Risk" value={sections.risk?.recommended_mode ?? "Not run"} />
-                    <SummaryCard label="Forecast" value={sections.forecast?.containment_outlook ?? "Not run"} />
-                    <SummaryCard label="Optimize" value={sections.optimization?.recommended_mode ?? "Not run"} />
-                    <SummaryCard label="Benchmark" value={sections.benchmark_detail?.best_strategy ?? sections.benchmark_detail?.status ?? "Not run"} />
+                    <SummaryCard label="Risk map" value={sections.risk?.recommended_mode ?? "Not run"} />
+                    <SummaryCard label="Spread forecast" value={sections.forecast?.containment_outlook ?? "Not run"} />
+                    <SummaryCard label="Intervention plan" value={sections.optimization?.recommended_mode ?? "Not run"} />
+                    <SummaryCard label="Benchmark evidence" value={sections.benchmark_detail?.best_strategy ?? sections.benchmark_detail?.status ?? "Not run"} />
                   </div>
 
-                  {sections.executive_summary ? (
-                    <ReportListCard title="Executive summary" items={sections.executive_summary as string[]} />
-                  ) : null}
+                  {sections.executive_summary ? <ReportListCard title="Executive summary" items={sections.executive_summary as string[]} /> : null}
 
-                  {sections.methodology ? (
-                    <ReportListCard title="Methodology" items={sections.methodology as string[]} />
-                  ) : null}
+                  {sections.methodology ? <ReportListCard title="Methodology" items={sections.methodology as string[]} /> : null}
 
                   <details>
                     <summary className="cursor-pointer text-[12px] font-medium text-muted-foreground hover:text-foreground">View raw markdown</summary>
@@ -207,7 +203,7 @@ export function ReportsPage() {
             </div>
           </SectionPanel>
         ) : (
-          <EmptyState title="No report selected" description="Generate or open a report to preview and export it." />
+          <EmptyState title="No report selected" description="Generate or open a decision brief to preview the recommendation trail and export it." />
         )}
       </div>
     </div>

@@ -37,7 +37,7 @@ export const api = {
   updateScenario: (id: string, payload: Partial<ScenarioPayload> & { archived?: boolean }) =>
     request<Scenario>(`/scenarios/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deleteScenario: (id: string) => request<{ message: string }>(`/scenarios/${id}`, { method: "DELETE" }),
-  runRisk: (payload: { scenario_id: string; modes?: string[]; threshold?: number }) =>
+  runRisk: (payload: { scenario_id: string; modes?: string[]; threshold?: number; horizon_steps?: number; sample_count?: number; seed?: number }) =>
     request<RiskRun>("/risk/run", { method: "POST", body: JSON.stringify(payload) }),
   listRiskRuns: (scenarioId?: string) =>
     request<RiskRun[]>(`/risk/runs${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ""}`),

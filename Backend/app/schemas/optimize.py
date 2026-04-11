@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 
 class OptimizationRunCreate(BaseModel):
     scenario_id: str
-    intervention_budget_k: int = Field(default=10, ge=1, le=20)
-    reduced_candidate_count: int = Field(default=8, ge=4, le=12)
+    intervention_budget_k: int = Field(default=10, ge=10, le=10)
+    reduced_candidate_count: int = Field(default=12, ge=10, le=16)
 
 
 class OptimizationRunResponse(BaseModel):

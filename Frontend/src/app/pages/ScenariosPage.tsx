@@ -68,8 +68,8 @@ export function ScenariosPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Scenario library"
-        title="Persisted wildfire scenarios"
-        description="Manage reusable 10x10 constrained spatial systems. Every edit is versioned so later runs reference the exact scenario state they used."
+        title="Wildfire planning scenarios"
+        description="Manage the saved hillside cases that feed the risk map, spread forecast, intervention plan, benchmark integrity run, and final report."
         actions={
           <Link to="/app/scenarios/new" className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white">
             <span className="inline-flex items-center gap-2">
@@ -96,7 +96,7 @@ export function ScenariosPage() {
         </div>
       </SectionPanel>
 
-      <SectionPanel title="Scenario records" subtitle="Only the fields needed to run the workflow are shown here.">
+      <SectionPanel title="Scenario records" subtitle="Each record captures the minimum information needed to run the full wildfire planning workflow.">
         <div className="overflow-hidden rounded-2xl border border-border">
           <table className="w-full bg-white/90">
             <thead className="bg-slate-50">

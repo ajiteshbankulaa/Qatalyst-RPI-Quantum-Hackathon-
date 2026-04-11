@@ -20,10 +20,10 @@ import { useAsyncData } from "../useAsyncData";
 const navItems = [
   { path: "/app", label: "Overview", icon: LayoutDashboard },
   { path: "/app/scenarios", label: "Scenarios", icon: Layers },
-  { path: "/app/risk", label: "Risk", icon: AlertTriangle },
-  { path: "/app/forecast", label: "Forecast", icon: TrendingUp },
-  { path: "/app/optimize", label: "Optimize", icon: Target },
-  { path: "/app/benchmarks", label: "Benchmarks", icon: Cpu },
+  { path: "/app/risk", label: "Risk Map", icon: AlertTriangle },
+  { path: "/app/forecast", label: "Spread Forecast", icon: TrendingUp },
+  { path: "/app/optimize", label: "Intervention Plan", icon: Target },
+  { path: "/app/benchmarks", label: "Benchmark Integrity", icon: Cpu },
   { path: "/app/reports", label: "Reports", icon: FileText },
   { path: "/app/integrations", label: "Integrations", icon: Plug },
   { path: "/app/settings", label: "Settings", icon: Settings },
@@ -48,7 +48,7 @@ export function AppShell() {
             </div>
             <div>
               <p className="text-[15px] font-semibold">QuantumProj</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-white/45">Wildfire resilience</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-white/45">Wildfire planning</p>
             </div>
           </div>
 

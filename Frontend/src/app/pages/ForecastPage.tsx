@@ -76,8 +76,8 @@ export function ForecastPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Step 3 - Forecast"
-        title="Wildfire spread simulation"
-        description="Project spread over discrete time steps with explicit dryness, wind, and sensitivity controls. Shift-circuit diagnostics are shown as support for forecast integrity."
+        title="Spread forecast"
+        description="Project how ignition pressure may move across the hillside over time. Dryness, wind, and spread sensitivity stay explicit so the forecast remains interpretable."
         actions={
           <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-50">
             {running ? "Running..." : "Run forecast"}
@@ -89,7 +89,7 @@ export function ForecastPage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
-          <SectionPanel title="Parameters" subtitle="Configure the simulation before running">
+          <SectionPanel title="Forecast inputs" subtitle="Set the weather and spread assumptions before running the forecast">
             <div className="grid gap-4 lg:grid-cols-5">
               <div>
                 <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Scenario</label>
@@ -135,7 +135,7 @@ export function ForecastPage() {
               </div>
 
               <div className="grid gap-6 xl:grid-cols-[1.2fr_0.9fr]">
-                <SectionPanel title="Spread snapshots" subtitle="Step through the forecasted scenario state">
+                <SectionPanel title="Spread snapshots" subtitle="Step through the projected hillside state one time step at a time">
                   <ScenarioGrid grid={activeSnapshot?.grid ?? selectedScenario?.grid ?? []} />
                   <input
                     type="range"
@@ -151,7 +151,7 @@ export function ForecastPage() {
                   </div>
                 </SectionPanel>
 
-                <SectionPanel title="Diagnostics" subtitle="Hardware-aware shift-kernel metrics used as forecast support">
+                <SectionPanel title="Forecast diagnostics" subtitle="Shift-kernel metrics included as supporting evidence for forecast execution quality">
                   <div className="space-y-3">
                     <div className="rounded-2xl border border-border bg-white/80 p-4">
                       <p className="text-[13px] font-semibold">Baseline shift circuit</p>
@@ -184,12 +184,12 @@ export function ForecastPage() {
           ) : (
             <EmptyState
               title="No forecast run yet"
-              description="Configure the parameters and run a forecast to inspect spread timelines and supporting diagnostics."
+              description="Run a forecast to inspect projected spread snapshots, threshold timing, and the diagnostic support layer behind the simulation."
             />
           )}
         </div>
 
-        <SectionPanel title="Recent runs" subtitle={historyLoading ? "Loading scenario history..." : "Latest persisted runs for this scenario"}>
+        <SectionPanel title="Recent forecasts" subtitle={historyLoading ? "Loading scenario history..." : "Saved spread forecasts for this scenario"}>
           <div className="space-y-3">
             {(runHistory ?? []).length === 0 ? (
               <p className="text-[12px] text-muted-foreground">No forecast runs saved for this scenario yet.</p>

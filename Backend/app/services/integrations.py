@@ -103,6 +103,7 @@ def collect_provider_statuses() -> list[dict]:
     """Collect real-time status for all integration providers."""
     qiskit_installed = _module_available("qiskit")
     aer_installed = _module_available("qiskit_aer")
+    qasm3_import_installed = _module_available("qiskit_qasm3_import")
     qbraid_status = _check_qbraid_status()
 
     # Only do the IBM connectivity check if credentials exist
@@ -128,12 +129,14 @@ def collect_provider_statuses() -> list[dict]:
         {
             "provider": "qiskit",
             "available": qiskit_installed,
-            "mode": "ready" if qiskit_installed else "missing",
+            "mode": "benchmark_ready" if qiskit_installed and aer_installed and qasm3_import_installed else "ready" if qiskit_installed else "missing",
             "details": {
                 "sdk_installed": qiskit_installed,
                 "version": _get_version("qiskit"),
                 "aer_installed": aer_installed,
                 "aer_version": _get_version("qiskit-aer"),
+                "qasm3_import_installed": qasm3_import_installed,
+                "qasm3_import_version": _get_version("qiskit-qasm3-import"),
                 "role": "Primary quantum circuit framework for QAOA workloads and simulator execution.",
             },
         },
