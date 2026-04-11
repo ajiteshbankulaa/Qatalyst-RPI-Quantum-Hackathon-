@@ -128,7 +128,7 @@ def _ensemble_labels(grid: list[list[str]], environment: dict, horizon_steps: in
     forecast = run_stochastic_forecast(grid, environment, steps=horizon_steps, seed=seed, runs=12)
     label_grid = np.zeros((len(grid), len(grid[0])), dtype=int)
     for cell in forecast["burn_probability_map"]:
-        label_grid[cell["row"], cell["col"]] = int(cell["probability"] >= 0.45)
+        label_grid[cell["row"], cell["col"]] = int(cell["probability"] >= 0.3)
     return label_grid
 
 
@@ -148,7 +148,9 @@ def _build_dataset(
     scoring_samples: list[np.ndarray] = []
     scoring_refs: list[tuple[int, int, str]] = []
 
-    while True:
+    iterations = 0
+    while iterations < 8:
+        iterations += 1
         features = []
         labels = []
         for profile in profiles:
@@ -160,9 +162,16 @@ def _build_dataset(
                     features.append(_cell_feature_vector(training_grid, row, col, environment))
                     labels.append(int(labels_grid[row, col]))
         counts = np.bincount(np.asarray(labels, dtype=int), minlength=2)
-        if (len(np.unique(labels)) > 1 and int(counts.min()) >= 2) or effective_horizon <= 1:
+        if len(np.unique(labels)) > 1 and int(counts.min()) >= 10:
             break
-        effective_horizon -= 1
+        # If heavily biased towards 1s (saturated), reduce horizon
+        if counts[1] > counts[0] * 3 and effective_horizon > 1:
+            effective_horizon -= 1
+        # If heavily biased towards 0s (no spread), increase horizon
+        elif counts[0] > counts[1] * 3 and effective_horizon < 8:
+            effective_horizon += 1
+        else:
+            break
 
     scoring_environment = build_environment(base_environment)
     preview = run_stochastic_forecast(normalized_scenario, scoring_environment, steps=effective_horizon, seed=seed, runs=16)
@@ -183,7 +192,7 @@ def _build_dataset(
     summary = {
         "classification_task": f"Predict whether a cell belongs to the early ignition corridor within {effective_horizon} forecast steps.",
         "effective_label_horizon_steps": effective_horizon,
-        "label_definition": f"label=1 when ensemble burn probability is at least 0.45 by step {effective_horizon}.",
+        "label_definition": f"label=1 when ensemble burn probability is at least 0.3 by step {effective_horizon}.",
         "feature_names": FEATURE_NAMES,
         "sample_count": int(len(y)),
         "positive_samples": int(y.sum()),

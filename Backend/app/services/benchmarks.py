@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.models import BenchmarkRun, OptimizationRun, Scenario
 from app.services.optimize import candidate_rows
 from app.services.spatial import neighbors
+from app.services.wildfire_model import build_environment, default_environment
 
 
 @dataclass(frozen=True)
@@ -79,8 +80,8 @@ def _version(name: str) -> str | None:
         return None
 
 
-def _build_problem(grid: list[list[str]], reduced_count: int) -> tuple[list[dict], QAOAProblem]:
-    candidates = candidate_rows(grid)[:reduced_count]
+def _build_problem(grid: list[list[str]], reduced_count: int, environment: dict) -> tuple[list[dict], QAOAProblem]:
+    candidates = candidate_rows(grid, environment)[:reduced_count]
     weights = [round(float(row["score"]), 4) for row in candidates]
     penalties: dict[tuple[int, int], float] = {}
     for idx, candidate in enumerate(candidates):
@@ -506,7 +507,8 @@ def create_benchmark_run(
     optimization_run: OptimizationRun | None = None,
 ) -> BenchmarkRun:
     availability = benchmark_availability(payload.get("environments"))
-    candidates, problem = _build_problem(scenario.grid, payload["reduced_candidate_count"])
+    environment = build_environment(default_environment(scenario))
+    candidates, problem = _build_problem(scenario.grid, payload["reduced_candidate_count"], environment)
     exact_bits, exact_cost = brute_force_best(problem)
     worst_bits, worst_cost = brute_force_worst(problem)
     now = datetime.now(timezone.utc)

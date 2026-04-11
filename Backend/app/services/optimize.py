@@ -104,9 +104,8 @@ def _candidate_impact(grid: list[list[str]], candidate: dict) -> dict:
     }
 
 
-def candidate_rows(grid: list[list[str]]) -> list[dict]:
-    base_environment = build_environment(default_environment(type("ScenarioStub", (), {"grid": grid, "constraints_json": {}, "metadata_json": {}})()))
-    baseline = _evaluate_grid(grid, base_environment, seed=17, runs=10)
+def candidate_rows(grid: list[list[str]], environment: dict) -> list[dict]:
+    baseline = _evaluate_grid(grid, environment, seed=17, runs=10)
     base_rows = _candidate_base_rows(
         grid,
         baseline["forecast"]["burn_probability_lookup"],
@@ -121,7 +120,7 @@ def _greedy_classical_plan(grid: list[list[str]], enforced_budget: int, environm
     baseline = _evaluate_grid(working_grid, environment, seed=41, runs=18)
     placements: list[dict] = []
     for step in range(enforced_budget):
-        ranked = [item for item in candidate_rows(working_grid) if (item["row"], item["col"]) not in {(p["row"], p["col"]) for p in placements}]
+        ranked = [item for item in candidate_rows(working_grid, environment) if (item["row"], item["col"]) not in {(p["row"], p["col"]) for p in placements}]
         if not ranked:
             break
         choice = ranked[0]
@@ -140,7 +139,7 @@ def _greedy_classical_plan(grid: list[list[str]], enforced_budget: int, environm
 
 
 def _reduced_quantum_study(grid: list[list[str]], reduced_count: int, enforced_budget: int, environment: dict) -> dict:
-    shortlist = candidate_rows(grid)[:reduced_count]
+    shortlist = candidate_rows(grid, environment)[:reduced_count]
     reduced = shortlist[: min(8, len(shortlist))]
     weights = [round(float(item["score"]), 4) for item in reduced]
     penalties: dict[tuple[int, int], float] = {}

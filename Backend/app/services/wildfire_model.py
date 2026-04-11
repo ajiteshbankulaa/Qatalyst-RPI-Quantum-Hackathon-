@@ -181,30 +181,35 @@ def local_hazard_features(grid: list[list[str]], row: int, col: int, environment
     }
 
 
-def _hazard_score(grid: list[list[str]], burning: set[tuple[int, int]], row: int, col: int, environment: dict) -> float:
+def _ignition_probability(grid: list[list[str]], burning: set[tuple[int, int]], row: int, col: int, environment: dict) -> float:
     normalized = normalize_grid(grid)
     semantics = CELL_LIBRARY[normalized[row][col]]
     features = local_hazard_features(normalized, row, col, environment)
     adjacency_pressure = _adjacency_pressure(normalized, burning, row, col, environment["wind_direction"])
+    
+    if adjacency_pressure <= 1e-4:
+        return 0.0
+        
     dryness = environment["dryness"]
     spread = environment["spread_sensitivity"]
     wind_speed = environment["wind_speed"]
     slope = environment["slope_influence"] * features["slope_factor"]
-    spotting = environment["spotting_likelihood"] * semantics.ember_propensity
     suppression = environment["suppression_effectiveness"] * semantics.treatment_resistance
-    return (
-        -2.7
-        + 2.1 * semantics.base_ignitability
-        + 1.5 * semantics.fuel_load
-        + 1.1 * features["local_fuel_density"]
-        + 1.9 * adjacency_pressure
-        + 1.0 * dryness
-        + 0.9 * spread
-        + 0.7 * wind_speed * features["wind_exposure"]
-        + 0.55 * slope
-        + 0.25 * spotting
-        - 1.45 * suppression
+
+    susceptibility_linear = (
+        -2.5
+        + 1.8 * semantics.base_ignitability
+        + 1.2 * semantics.fuel_load
+        + 0.8 * features["local_fuel_density"]
+        + 1.5 * dryness
+        + 1.0 * spread
+        + 0.8 * wind_speed * features["wind_exposure"]
+        + 0.6 * slope
+        - 2.5 * suppression
     )
+    
+    susceptibility = _sigmoid(susceptibility_linear)
+    return 1.0 - math.exp(-0.8 * adjacency_pressure * susceptibility)
 
 
 def _sample_environment(environment: dict, rng: np.random.Generator) -> dict:
@@ -270,7 +275,7 @@ def run_stochastic_forecast(
                     semantics = CELL_LIBRARY[state]
                     if state in {"ignition", "burned"} or semantics.hard_barrier or not semantics.burnable:
                         continue
-                    probability = _clip(_sigmoid(_hazard_score(run_grid, active_burning, row, col, env)), 0.0, 0.97)
+                    probability = _clip(_ignition_probability(run_grid, active_burning, row, col, env), 0.0, 0.97)
                     if rng.random() < probability:
                         new_ignitions.add((row, col))
 
