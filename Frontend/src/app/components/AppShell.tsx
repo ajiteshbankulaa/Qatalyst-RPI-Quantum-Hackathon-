@@ -39,20 +39,21 @@ export function AppShell() {
   );
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.08),transparent_28%),linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] text-foreground">
-      <div className="mx-auto flex min-h-screen max-w-[1600px]">
-        <aside className="hidden w-[280px] shrink-0 border-r border-white/60 bg-[linear-gradient(180deg,#0f1729_0%,#111f36_100%)] px-5 py-6 text-white lg:flex lg:flex-col">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
+    <div className="min-h-screen bg-background text-foreground font-sans">
+      <div className="mx-auto flex min-h-screen 2xl:max-w-[1800px] border-x border-border shadow-2xl bg-white">
+        <aside className="hidden w-[280px] shrink-0 border-r border-border bg-card px-6 py-8 text-foreground lg:flex lg:flex-col relative z-10">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="flex h-10 w-10 items-center justify-center rounded-none bg-primary text-primary-foreground">
               <Atom className="h-5 w-5 text-qp-cyan" />
             </div>
             <div>
-              <p className="text-[15px] font-semibold">QuantumProj</p>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-white/45">Wildfire planning</p>
+              <p className="text-[16px] font-bold tracking-tight">QuantumProj</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mt-0.5">Decision Intelligence</p>
             </div>
           </div>
 
-          <nav className="mt-8 space-y-1">
+          <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Workflow</p>
+          <nav className="space-y-1">
             {navItems.map((item) => {
               const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
               return (
@@ -60,8 +61,8 @@ export function AppShell() {
                   key={item.path}
                   to={item.path}
                   className={cx(
-                    "flex items-center gap-3 rounded-2xl px-4 py-3 text-[13px] transition-colors",
-                    active ? "bg-white text-slate-900 shadow-sm" : "text-white/70 hover:bg-white/8 hover:text-white",
+                    "flex items-center gap-3 border-l-2 px-4 py-2.5 text-[13px] font-medium transition-all duration-200",
+                    active ? "border-primary bg-secondary/50 text-foreground" : "border-transparent text-muted-foreground hover:bg-secondary/20 hover:text-foreground",
                   )}
                 >
                   <item.icon className="h-4 w-4" />
@@ -72,14 +73,17 @@ export function AppShell() {
           </nav>
         </aside>
 
-        <div className="flex min-h-screen flex-1 flex-col">
-          <header className="sticky top-0 z-20 border-b border-white/70 bg-white/80 px-5 py-4 backdrop-blur xl:px-8">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-h-screen flex-1 flex-col bg-[#fdfdfc]">
+          <header className="sticky top-0 z-20 border-b border-border bg-white/95 px-6 py-5 backdrop-blur-md lg:px-10">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">QuantumProj</p>
-                <h1 className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-foreground">{activeLabel}</h1>
+                <nav className="flex text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-1.5 space-x-2">
+                  <span>QuantumProj</span>
+                  <span>/</span>
+                  <span className="text-foreground">{activeLabel}</span>
+                </nav>
               </div>
-              <div className="flex flex-1 items-center gap-3 lg:justify-end">
+              <div className="flex flex-1 items-center gap-4 lg:justify-end">
                 {integrations ? (
                   <StatusPill label={integrations.simulator_only ? "Simulator only" : "Hardware ready"} tone={integrations.simulator_only ? "warn" : "good"} />
                 ) : null}
@@ -87,9 +91,9 @@ export function AppShell() {
             </div>
           </header>
 
-          <main className="flex-1 px-5 py-6 xl:px-8">
+          <main className="flex-1 px-6 py-8 lg:px-10">
             {integrations ? (
-              <div className="mb-6">
+              <div className="mb-8">
                 <SimulatorBanner simulatorOnly={integrations.simulator_only} qbraidReady={integrations.qbraid_ready} />
               </div>
             ) : null}

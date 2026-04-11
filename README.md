@@ -4,7 +4,7 @@ QuantumProj is a wildfire resilience planning and benchmarking application built
 
 `Scenario -> Risk Map -> Spread Forecast -> Intervention Plan -> Benchmark Integrity -> Report`
 
-The current product wedge is concrete: a planner or resilience analyst defines a 10x10 wildfire hillside, classifies early ignition risk, simulates spread, places a strict budget of fire-resistant interventions, and then checks whether the reduced quantum optimization workload still behaves well after qBraid-centered compilation and execution.
+The current product wedge is concrete: a planner or resilience analyst defines a 10x10 wildfire hillside, classifies early ignition corridor risk, simulates stochastic ensemble spread, places a strict budget of fire-resistant interventions, and then checks whether the reduced quantum optimization workload still behaves well after qBraid-centered compilation and execution.
 
 ## Which Challenges This Targets
 
@@ -26,22 +26,72 @@ The intended user is a wildfire planner, land management team, resilience analys
 The product is not a generic quantum dashboard. Each module supports the same wildfire decision chain:
 
 1. Build or edit a hillside scenario.
-2. Run ignition risk classification.
-3. Forecast how spread may propagate.
-4. Recommend where limited interventions should be placed.
+2. Run early ignition corridor classification.
+3. Forecast how spread may propagate under uncertainty.
+4. Recommend where limited interventions should be placed to reduce likely burned area and corridor exposure.
 5. Benchmark whether the reduced quantum optimization workflow survives realistic compilation and execution constraints.
 6. Generate a report from explicit persisted runs.
 
 ## Technical Contributions
+
+### Planning-Grade Wildfire Science Backbone
+
+Risk, forecast, and optimization now use one shared wildfire semantics layer instead of separate heuristics.
+
+Supported normalized cell semantics:
+
+- `empty`
+- `water`
+- `road_or_firebreak`
+- `dry_brush`
+- `grass`
+- `shrub`
+- `tree`
+- `protected`
+- `intervention`
+- `ignition`
+- `burned`
+
+Each state maps to centralized planning-grade parameters such as fuel load, ignitability, burn duration, spotting propensity, and treatment resistance. Shared environmental controls are also consistent across modules:
+
+- dryness / fuel-moisture proxy
+- wind speed
+- wind direction
+- slope influence
+- spotting likelihood
+- suppression / treatment effectiveness
+
+This is not a live incident command fire physics solver. It is a comparative planning tool that uses simplified but internally consistent wildfire behavior to support preseason scenario analysis.
+
+### Wildfire Forecasting Model
+
+The forecast layer is now ensemble-based and stochastic rather than a single deterministic threshold rollout.
+
+- discrete time-step simulation
+- cells can remain burning for multiple steps before becoming burned
+- ignition is probabilistic, not threshold-only
+- wind acts directionally
+- slope can accelerate uphill spread
+- ember spotting can create occasional nonlocal ignitions
+- treated and protected cells reduce risk rather than acting as perfect blockers
+
+Forecast outputs now include:
+
+- burn probability map
+- expected ignition time map
+- representative ensemble snapshots
+- likely spread corridors
+- final burned area distribution
+- mean and percentile burned-area summaries
 
 ### Wildfire Optimization Mapping
 
 The optimization engine maps directly onto the wildfire challenge framing:
 
 - grid size: `10x10`
-- spread pathways: orthogonal adjacency on flammable cells
+- spread pathways: orthogonal adjacency on flammable cells, interpreted through the same fuel semantics used in forecast and risk
 - intervention budget: strict `K=10`
-- objective: reduce surviving flammable links, ignition-connected corridors, and the largest remaining flammable cluster
+- objective: reduce surviving flammable links, ignition-connected corridors, expected burned area, and high-probability spread pathways
 
 This is handled honestly at two scales:
 
@@ -55,14 +105,18 @@ The UI and summaries explicitly distinguish `classical full-grid planning` from 
 The risk layer is a real binary classification workflow, not heuristic scoring.
 
 - task:
-  - predict whether a cell ignites within the early response window
+  - predict whether a cell belongs to the early ignition corridor within the planning response window
 - dataset:
-  - reproducible Monte Carlo spread simulations on scenario variants derived from the selected hillside
+  - reproducible ensemble spread simulations on scenario variants derived from the selected hillside
 - shared features:
-  - `state_risk`
-  - `ignition_pressure`
+  - `fuel_load`
+  - `base_ignitability`
+  - `local_fuel_density`
   - `distance_risk`
-  - `environmental_force`
+  - `wind_exposure`
+  - `slope_factor`
+  - `treated`
+  - `connectivity_proxy`
 - models:
   - classical logistic regression
   - shallow Qiskit variational quantum classifier
@@ -72,6 +126,7 @@ The risk layer is a real binary classification workflow, not heuristic scoring.
   - precision
   - recall
   - F1
+  - AUROC
   - runtime
 
 Current honest finding:
@@ -79,6 +134,22 @@ Current honest finding:
 - the classical baseline is usually the best practical model
 - the QML model is slower and trained on a reduced balanced subset
 - the comparison is still meaningful because it is run on the same task and evaluation split
+
+### What the Science Is and Is Not Claiming
+
+QuantumProj is intended for planning-grade comparative analysis:
+
+- compare scenarios
+- identify likely exposure corridors
+- test intervention placement choices
+- stress-test reduced quantum workloads under compilation and execution constraints
+
+It is not claiming:
+
+- real-time incident prediction
+- full fire physics fidelity
+- exact operational behavior under field conditions
+- full-scale 100-qubit deployable optimization on current NISQ hardware
 
 ### qBraid Benchmarking Workload
 
@@ -160,9 +231,9 @@ Important files:
 ### How the Modules Connect
 
 - scenarios provide the shared 10x10 hillside state
-- risk uses the scenario to generate a labeled wildfire classification dataset
-- forecast simulates spread on the same grid
-- optimize uses the same grid as an adjacency graph with strict `K=10`
+- risk uses the scenario plus the shared wildfire model to generate a labeled wildfire classification dataset
+- forecast simulates stochastic ensemble spread on the same grid
+- optimize uses the same semantics and environment to score interventions under strict `K=10`
 - benchmarks derive a reduced QAOA workload from the intervention problem
 - reports assemble persisted run artifacts across the workflow
 
@@ -291,9 +362,10 @@ npm.cmd run build
 Coverage focus:
 
 - API flow and persistence
+- shared wildfire state normalization and ensemble behavior
 - risk dataset generation and ML/QML comparison
-- forecast snapshots and diagnostics
-- wildfire optimization constraints and explanations
+- forecast ensemble summaries and diagnostics
+- wildfire optimization constraints, consistency, and explanations
 - benchmark structure, metrics, and degraded mode behavior
 - basic frontend navigation/report wiring smoke tests
 

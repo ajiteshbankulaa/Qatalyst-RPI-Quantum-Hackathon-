@@ -86,7 +86,7 @@ export function BenchmarksPage() {
         title="Benchmark integrity"
         description="Study how the reduced wildfire intervention QAOA workload survives qBraid-centered compilation across strategies and execution environments."
         actions={
-          <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-50">
+          <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="inline-flex items-center justify-center bg-primary px-6 py-3 text-[13px] font-bold uppercase tracking-wider text-primary-foreground transition-all hover:bg-qp-slate disabled:opacity-50">
             {running ? "Running benchmark..." : "Run benchmark"}
           </button>
         }
@@ -100,8 +100,8 @@ export function BenchmarksPage() {
           <SectionPanel>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Scenario</label>
-                <select value={activeScenarioId} onChange={(event) => setScenarioId(event.target.value)} className="min-w-[320px] rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none">
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Scenario</label>
+                <select value={activeScenarioId} onChange={(event) => setScenarioId(event.target.value)} className="min-w-[320px] border border-border bg-card px-4 py-2.5 text-[13px] outline-none focus:border-primary transition-colors">
                   {scenarios.map((scenario) => (
                     <option key={scenario.id} value={scenario.id}>
                       {scenario.name}
@@ -132,7 +132,7 @@ export function BenchmarksPage() {
                     <MetricTile label="Strategies" value={String(strategies.length)} hint={strategies.map((item) => item.intermediate_representation).join(" vs ")} />
                     <MetricTile label="Environments" value={String(environments.length)} hint={environments.join(", ")} />
                   </div>
-                  <p className="mt-4 text-[13px] leading-6 text-muted-foreground">{workload.wildfire_relevance}</p>
+                  <p className="mt-5 border-t border-border pt-4 text-[13px] leading-relaxed text-muted-foreground">{workload.wildfire_relevance}</p>
                 </SectionPanel>
               ) : null}
 
@@ -140,10 +140,10 @@ export function BenchmarksPage() {
                 <SectionPanel title="Compared qBraid strategies" subtitle="The benchmark compares distinct qBraid transformation and target-preparation choices">
                   <div className="grid gap-4 lg:grid-cols-2">
                     {strategies.map((strategy) => (
-                      <div key={strategy.id} className="rounded-2xl border border-border bg-white/80 p-4">
-                        <p className="text-[14px] font-semibold">{strategy.label}</p>
-                        <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{strategy.description}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
+                      <div key={strategy.id} className="border border-border bg-card p-5 border-l-2 border-l-qp-cyan">
+                        <p className="text-[14px] font-bold text-foreground mb-2">{strategy.label}</p>
+                        <p className="text-[13px] leading-relaxed text-muted-foreground">{strategy.description}</p>
+                        <div className="mt-4 flex flex-wrap gap-2">
                           <StatusPill label={strategy.intermediate_representation} tone="accent" />
                           <StatusPill label={strategy.compile_profile} tone="neutral" />
                           <StatusPill label={strategy.coupling_profile} tone="neutral" />
@@ -170,12 +170,14 @@ export function BenchmarksPage() {
                               if (!active || !payload?.[0]) return null;
                               const d = payload[0].payload;
                               return (
-                                <div className="rounded-xl border border-border bg-white p-3 text-[12px] shadow-lg">
-                                  <p className="font-semibold">{d.label}</p>
-                                  <p className="text-muted-foreground">{d.environment}</p>
-                                  <p className="mt-1">Depth: {d.x} • Approx. ratio: {d.y}%</p>
-                                  <p>Total gates: {d.gates} • 2Q gates: {d.twoQ}</p>
-                                  <p>Success probability: {d.success}%</p>
+                                <div className="border border-border bg-card p-4 text-[12px] shadow-sm">
+                                  <p className="font-bold text-foreground mb-1">{d.label}</p>
+                                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">{d.environment}</p>
+                                  <p className="mt-1 flex justify-between gap-4"><span>Depth:</span> <span className="font-mono text-foreground">{d.x}</span></p>
+                                  <p className="flex justify-between gap-4"><span>Approx. ratio:</span> <span className="font-mono text-foreground">{d.y}%</span></p>
+                                  <p className="mt-1 flex justify-between gap-4"><span>Total gates:</span> <span className="font-mono text-foreground">{d.gates}</span></p>
+                                  <p className="flex justify-between gap-4"><span>2Q gates:</span> <span className="font-mono text-foreground">{d.twoQ}</span></p>
+                                  <p className="mt-1 flex justify-between gap-4"><span>Success prob:</span> <span className="font-mono text-foreground">{d.success}%</span></p>
                                 </div>
                               );
                             }}
@@ -184,9 +186,9 @@ export function BenchmarksPage() {
                         </ScatterChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="overflow-hidden rounded-2xl border border-border">
-                      <table className="w-full bg-white/90 text-[12px]">
-                        <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+                    <div className="overflow-hidden border border-border bg-card">
+                      <table className="w-full text-[12px]">
+                        <thead className="bg-secondary/50 text-left text-[11px] uppercase tracking-[0.15em] font-bold text-muted-foreground border-b border-border">
                           <tr>
                             <th className="px-4 py-3">Strategy</th>
                             <th className="px-4 py-3">Environment</th>
@@ -222,14 +224,14 @@ export function BenchmarksPage() {
                 <SectionPanel title="Environment-by-environment outcome" subtitle="This is where the benchmark decides which strategy held up best under each execution context">
                   <div className="grid gap-4 lg:grid-cols-3">
                     {Object.entries(environmentSummary).map(([environment, summary]) => (
-                      <div key={environment} className="rounded-2xl border border-border bg-white/80 p-4">
-                        <p className="text-[14px] font-semibold">{environment}</p>
-                        <p className="mt-3 text-[12px] text-muted-foreground">Quality leader</p>
-                        <p className="text-[13px] font-medium">{String((summary as any).quality_winner?.strategy_label ?? "n/a")}</p>
-                        <p className="mt-2 text-[12px] text-muted-foreground">Cost leader</p>
-                        <p className="text-[13px] font-medium">{String((summary as any).cost_winner?.strategy_label ?? "n/a")}</p>
-                        <p className="mt-2 text-[12px] text-muted-foreground">Best tradeoff</p>
-                        <p className="text-[13px] font-medium">{String((summary as any).tradeoff_winner?.strategy_label ?? "n/a")}</p>
+                      <div key={environment} className="border border-border bg-card p-5">
+                        <p className="text-[13px] font-bold uppercase tracking-wider text-foreground mb-3 border-b border-border pb-2">{environment}</p>
+                        <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Quality leader</p>
+                        <p className="text-[14px] font-medium text-foreground">{String((summary as any).quality_winner?.strategy_label ?? "n/a")}</p>
+                        <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cost leader</p>
+                        <p className="text-[14px] font-medium text-foreground">{String((summary as any).cost_winner?.strategy_label ?? "n/a")}</p>
+                        <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Best tradeoff</p>
+                        <p className="text-[14px] font-medium text-foreground">{String((summary as any).tradeoff_winner?.strategy_label ?? "n/a")}</p>
                       </div>
                     ))}
                   </div>
@@ -238,10 +240,10 @@ export function BenchmarksPage() {
 
               <SectionPanel title="Continue workflow" subtitle="Use this run in reporting or inspect the full benchmark detail.">
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/app/benchmarks/${latestRun.id}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
+                  <Link to={`/app/benchmarks/${latestRun.id}`} className="border border-border bg-secondary/50 hover:bg-secondary px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
                     Open detail
                   </Link>
-                  <Link to={`/app/reports?scenario=${activeScenarioId}&benchmark=${latestRun.id}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
+                  <Link to={`/app/reports?scenario=${activeScenarioId}&benchmark=${latestRun.id}`} className="border border-border bg-secondary/50 hover:bg-secondary px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
                     Report with this run
                   </Link>
                 </div>
@@ -264,12 +266,12 @@ export function BenchmarksPage() {
                 <button
                   key={run.id}
                   onClick={() => setLatestRun(run)}
-                  className={`w-full rounded-2xl border p-4 text-left ${latestRun?.id === run.id ? "border-qp-cyan bg-cyan-50/40" : "border-border bg-white/80"}`}
+                  className={`w-full border p-4 text-left transition-colors ${latestRun?.id === run.id ? "border-primary bg-secondary/30" : "border-border bg-card hover:border-primary/50"}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[13px] font-semibold">{run.id.slice(0, 8)}</p>
-                      <p className="mt-1 text-[12px] text-muted-foreground">{new Date(run.created_at).toLocaleString()}</p>
+                      <p className="text-[13px] font-bold">{run.id.slice(0, 8)}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{new Date(run.created_at).toLocaleString()}</p>
                     </div>
                     <StatusPill label={run.status} tone={run.status === "complete" ? "good" : "warn"} />
                   </div>

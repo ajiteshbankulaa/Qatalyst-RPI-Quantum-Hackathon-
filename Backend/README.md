@@ -5,13 +5,13 @@ FastAPI backend for the QuantumProj MVP. This service owns persisted scenarios, 
 ## What it does
 
 - Stores wildfire-first 10x10 spatial scenarios in SQLite
-- Runs a real classical-vs-QML wildfire ignition classification study on the same scenario-derived dataset
-- Simulates propagation forecasts with time steps, dryness, wind direction, and spread sensitivity
+- Runs a real classical-vs-QML wildfire early-ignition-corridor classification study on the same scenario-derived dataset
+- Simulates stochastic ensemble propagation forecasts with time steps, burn duration, dryness, wind, slope, and spotting
 - Produces intervention plans with:
   - full-grid classical planning on the 10x10 adjacency graph
   - strict K=10 intervention handling
   - reduced critical-subgraph quantum study
-  - recommended deployable plan with before/after connectivity metrics
+  - recommended deployable plan with before/after connectivity and expected-burn metrics
 - Exposes qBraid-centered benchmark records and labels degraded mode honestly when qBraid and Qiskit are missing
 - Generates markdown-friendly decision reports from persisted run artifacts
 
@@ -30,11 +30,13 @@ The backend is now organized under `Backend/app/` with package folders for route
 - `services/scenarios.py`
   - Scenario CRUD and version bumps
 - `services/risk.py`
-  - Monte Carlo dataset generation plus classical logistic regression and Qiskit variational quantum classification
+  - ensemble-derived wildfire dataset generation plus classical logistic regression and Qiskit variational quantum classification
 - `services/forecast.py`
-  - Grid spread simulation plus shift-kernel diagnostics
+  - stochastic ensemble wildfire spread simulation plus shift-kernel diagnostics
 - `services/optimize.py`
-  - Full-grid classical intervention planning plus reduced quantum study
+  - Full-grid forecast-aware intervention planning plus reduced quantum study
+- `services/wildfire_model.py`
+  - shared wildfire semantics, fuel parameters, environment controls, probabilistic ignition logic, and ensemble summary helpers
 - `algorithms/qaoa.py`
   - QAOA problem formulation, real Qiskit circuit construction, and simulator execution helpers
 - `algorithms/shift.py`
@@ -58,14 +60,52 @@ The backend is now organized under `Backend/app/` with package folders for route
 - If IBM credentials are missing, the platform remains usable in simulator-only mode
 - Optimization labels full-scale classical versus reduced quantum study scope separately
 
+## Wildfire science note
+
+Risk, forecast, and optimization now share one planning-grade wildfire model.
+
+Normalized states:
+
+- `empty`
+- `water`
+- `road_or_firebreak`
+- `dry_brush`
+- `grass`
+- `shrub`
+- `tree`
+- `protected`
+- `intervention`
+- `ignition`
+- `burned`
+
+Each state maps to centralized parameters including:
+
+- base ignitability
+- burn duration
+- fuel load
+- spotting propensity
+- treatment resistance
+- spread receptivity
+
+Shared environmental controls:
+
+- dryness
+- wind speed
+- wind direction
+- slope influence
+- spotting likelihood
+- suppression effectiveness
+
+This backend is designed for preseason or scenario-analysis planning. It is not an operational fire behavior or incident command system.
+
 ## Wildfire optimization note
 
 The optimization engine is now explicitly challenge-aligned:
 
 - The deployable plan is built on the full 10x10 grid.
-- Spread pathways are defined by orthogonal adjacency between flammable dry-brush cells.
+- Spread pathways are defined by orthogonal adjacency on flammable cells under the shared wildfire semantics.
 - The enforced deployment budget is `K=10`.
-- Better plans are the ones that break more adjacency links, shrink the largest flammable cluster, and reduce ignition-connected spread corridors.
+- Better plans are the ones that break more adjacency links, shrink the largest flammable cluster, reduce ignition-connected spread corridors, and lower expected burned area under ensemble forecast conditions.
 
 This is split honestly across execution scales:
 
@@ -73,19 +113,45 @@ This is split honestly across execution scales:
 - The quantum study first shortlists the highest-impact cells and then runs on a smaller critical candidate subset derived from the same adjacency-based objective.
 - The final result compares the classical full-grid plan to a quantum-informed variant instead of pretending a full 100-qubit NISQ solve is currently practical.
 
+## Forecast realism note
+
+The forecast service no longer relies on a simple deterministic threshold.
+
+It now models:
+
+- probabilistic ignition
+- multi-step burning before burnout
+- directional wind effects
+- slope-assisted spread
+- ember spotting
+- run-to-run environmental variation
+
+Stored forecast outputs include:
+
+- representative sample snapshots
+- burn probability map
+- expected ignition time map
+- corridor summaries
+- final burned area distribution
+- planning-grade summary statistics
+
 ## Risk modeling note
 
 The risk engine now answers the Classical ML vs Quantum ML challenge more directly:
 
 - Binary task:
-  - predict whether a cell ignites within the early response window
+  - predict whether a cell belongs to the early ignition corridor within the planning response window
 - Dataset:
-  - generated from repeated spread simulations over reproducible scenario variants derived from the selected hillside
+  - generated from repeated ensemble spread simulations over reproducible scenario variants derived from the selected hillside
 - Shared feature set:
-  - `state_risk`
-  - `ignition_pressure`
+  - `fuel_load`
+  - `base_ignitability`
+  - `local_fuel_density`
   - `distance_risk`
-  - `environmental_force`
+  - `wind_exposure`
+  - `slope_factor`
+  - `treated`
+  - `connectivity_proxy`
 - Models compared:
   - classical logistic regression via scikit-learn
   - shallow Qiskit variational quantum classifier
@@ -95,6 +161,7 @@ The risk engine now answers the Classical ML vs Quantum ML challenge more direct
   - precision
   - recall
   - F1
+  - AUROC
   - runtime
 
 This stays honest: the QML model is a real comparator on the same binary task, but it is not forced to beat the classical baseline.
@@ -134,7 +201,7 @@ Backend variable names are standardized to:
 - `QISKIT_IBM_INSTANCE`
 - `CORS_ORIGINS`
 
-Use [`.env.example`](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/.env.example) as the canonical backend template.
+Use [`.env.example`](.env.example) as the canonical backend template.
 
 ## Runtime modes
 
@@ -240,6 +307,17 @@ The benchmark engine now answers the qBraid challenge requirements directly:
   - gate breakdown
 
 The benchmark summary now produces a direct conclusion string that compares quality preservation against compiled cost instead of reporting raw transpilation numbers only.
+
+## Planning-grade disclaimer
+
+The wildfire modules are deliberately simplified and comparative. They are intended to help users:
+
+- compare scenario variants
+- identify likely spread corridors
+- estimate relative intervention impact
+- evaluate benchmark integrity for reduced quantum workloads
+
+They should not be used as a replacement for operational fire behavior models, field intelligence, or emergency command systems.
 
 ## Future extension points
 

@@ -115,7 +115,7 @@ export function ReportsPage() {
         title="Decision reports"
         description="Assemble a wildfire planning brief from explicit scenario-linked runs so planners and research teams can review one coherent recommendation trail."
         actions={
-          <button onClick={() => void generate()} disabled={running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-50">
+          <button onClick={() => void generate()} disabled={running} className="inline-flex items-center justify-center bg-primary px-6 py-3 text-[13px] font-bold uppercase tracking-wider text-primary-foreground transition-all hover:bg-qp-slate disabled:opacity-50">
             {running ? "Generating..." : "Generate report"}
           </button>
         }
@@ -143,14 +143,14 @@ export function ReportsPage() {
                 <button
                   key={report.id}
                   onClick={() => setActiveReport(report)}
-                  className={`w-full rounded-2xl border p-4 text-left ${activeReport?.id === report.id ? "border-qp-cyan bg-cyan-50/30" : "border-border bg-white/80"}`}
+                  className={`w-full border p-4 text-left transition-colors ${activeReport?.id === report.id ? "border-primary bg-secondary/30" : "border-border bg-card hover:border-primary/50"}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <FileText className="h-5 w-5 text-muted-foreground" />
                       <div>
-                        <p className="text-[13px] font-semibold">{report.title}</p>
-                        <p className="mt-1 text-[12px] text-muted-foreground">{new Date(report.created_at).toLocaleString()}</p>
+                        <p className="text-[13px] font-bold text-foreground">{report.title}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{new Date(report.created_at).toLocaleString()}</p>
                       </div>
                     </div>
                     <StatusPill label={report.status} tone="good" />
@@ -167,13 +167,13 @@ export function ReportsPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => exportFile("markdown")}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-border bg-white px-4 py-2 text-[13px] font-medium text-foreground hover:bg-slate-50"
+                  className="inline-flex items-center gap-2 border border-border bg-card px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground hover:bg-secondary transition-colors"
                 >
                   <Download className="h-4 w-4" /> Export markdown
                 </button>
                 <button
                   onClick={() => exportFile("json")}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-border bg-white px-4 py-2 text-[13px] font-medium text-foreground hover:bg-slate-50"
+                  className="inline-flex items-center gap-2 border border-border bg-card px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground hover:bg-secondary transition-colors"
                 >
                   <Download className="h-4 w-4" /> Export JSON
                 </button>
@@ -193,8 +193,8 @@ export function ReportsPage() {
                   {sections.methodology ? <ReportListCard title="Methodology" items={sections.methodology as string[]} /> : null}
 
                   <details>
-                    <summary className="cursor-pointer text-[12px] font-medium text-muted-foreground hover:text-foreground">View raw markdown</summary>
-                    <div className="mt-2 rounded-2xl bg-slate-950 p-4 text-[11px] leading-5 text-slate-100">
+                    <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors">View raw markdown</summary>
+                    <div className="mt-3 border border-border bg-slate-950 p-5 text-[12px] font-mono leading-relaxed text-slate-100">
                       <pre className="whitespace-pre-wrap">{activeReport.export.content}</pre>
                     </div>
                   </details>
@@ -225,8 +225,8 @@ function Selector({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{label}</label>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none">
+      <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">{label}</label>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full border border-border bg-card px-4 py-2.5 text-[13px] outline-none focus:border-primary transition-colors">
         {allowLatest ? <option value="">Use latest available</option> : null}
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -240,22 +240,22 @@ function Selector({
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-white/60 p-4">
-      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-[14px] font-semibold">{value}</p>
+    <div className="border border-border bg-card p-5">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
+      <p className="text-[14px] font-medium text-foreground">{value}</p>
     </div>
   );
 }
 
 function ReportListCard({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="rounded-xl border border-border bg-white/60 p-4">
-      <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
-      <ul className="mt-3 space-y-2 text-[12px] leading-5 text-muted-foreground">
+    <div className="border border-border bg-card p-5">
+      <h3 className="text-[13px] font-bold uppercase tracking-wider text-foreground mb-3 border-b border-border pb-2">{title}</h3>
+      <ul className="space-y-3 text-[13px] leading-relaxed text-muted-foreground">
         {items.map((line, idx) => (
-          <li key={idx} className="flex gap-2">
-            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-qp-cyan" />
-            {line}
+          <li key={idx} className="flex gap-3">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-primary" />
+            <span className="text-foreground">{line}</span>
           </li>
         ))}
       </ul>

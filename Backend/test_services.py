@@ -16,6 +16,7 @@ from app.services import integrations as integration_service  # noqa: E402
 from app.services.forecast import create_forecast_run  # noqa: E402
 from app.services.optimize import candidate_rows, create_optimization_run  # noqa: E402
 from app.services.risk import _build_dataset, create_risk_run  # noqa: E402
+from app.services.wildfire_model import default_environment, normalize_grid, run_stochastic_forecast  # noqa: E402
 
 
 @pytest.fixture
@@ -58,7 +59,19 @@ def test_risk_dataset_generation_returns_supervised_split(scenario: Scenario):
     assert dataset.summary["test_samples"] > 0
     assert dataset.summary["positive_samples"] > 0
     assert dataset.summary["negative_samples"] > 0
-    assert dataset.feature_names == ["state_risk", "ignition_pressure", "distance_risk", "environmental_force"]
+    assert dataset.feature_names == ["fuel_load", "base_ignitability", "local_fuel_density", "distance_risk", "wind_exposure", "slope_factor", "treated", "connectivity_proxy"]
+    assert dataset.summary["preview_burn_probability_map"]
+
+
+def test_wildfire_model_normalizes_states_and_builds_ensemble(scenario: Scenario):
+    scenario.grid[0][1] = "road_or_firebreak"
+    normalized = normalize_grid(scenario.grid)
+    assert normalized[0][1] == "road_or_firebreak"
+    environment = default_environment(scenario)
+    forecast = run_stochastic_forecast(normalized, environment, steps=4, seed=17, runs=8)
+    assert forecast["burn_probability_map"]
+    assert forecast["expected_ignition_time_map"]
+    assert len(forecast["final_burned_area_distribution"]) == 8
 
 
 def test_risk_service_returns_real_ml_comparison(db_session: Session, scenario: Scenario):
@@ -89,6 +102,8 @@ def test_forecast_service_returns_snapshots_and_diagnostics(db_session: Session,
     assert run.status == "complete"
     assert len(run.snapshots_json) == 6
     assert run.summary_json["peak_ignited_cells"] >= 1
+    assert run.summary_json["ensemble_runs"] >= 1
+    assert run.diagnostics_json["ensemble"]["burn_probability_map"]
     assert run.diagnostics_json["optimized_shift"]["depth"] < run.diagnostics_json["baseline_shift"]["depth"]
 
 
@@ -109,6 +124,8 @@ def test_optimization_service_builds_real_or_labeled_quantum_scope(db_session: S
     assert run.summary_json["broken_adjacency_links"] >= 0
     assert run.results_json["quantum"]["scope"]["shortlist_count"] == 12
     assert run.results_json["quantum"]["scope"]["candidate_count"] <= 8
+    assert "mean_final_burned_area" in run.results_json["baseline"]["metrics"]
+    assert run.summary_json["expected_burned_area_reduction"] >= 0
 
 
 def test_optimization_service_enforces_k10_cap(db_session: Session, scenario: Scenario):
@@ -125,7 +142,7 @@ def test_candidate_rows_are_adjacency_aligned(db_session: Session, scenario: Sce
     ranked = candidate_rows(scenario.grid)
     assert ranked
     top = ranked[0]
-    assert top["state"] in {"dry_brush", "ignition"}
+    assert top["state"] in {"dry_brush", "ignition", "tree", "protected"}
     assert "blocked_links" in top
     assert "component_contains_ignition" in top
 
@@ -138,7 +155,7 @@ def test_optimization_recommendations_include_explanations(db_session: Session, 
     )
     placement = run.results_json["recommended_plan"]["placements"][0]
     assert "reason" in placement
-    assert "blocked_links" in placement
+    assert "expected_burned_area_reduction" in placement
     assert "selected_by_quantum" in placement
     assert run.results_json["quantum"]["scope"]["shortlist_count"] >= run.results_json["quantum"]["scope"]["candidate_count"]
 

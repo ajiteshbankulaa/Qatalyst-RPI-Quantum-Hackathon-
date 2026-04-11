@@ -10,59 +10,87 @@ import type { CellState, ScenarioPayload } from "../types";
 const templates: Array<{ key: string; label: string; payload: ScenarioPayload }> = [
   {
     key: "base",
-    label: "Base wildfire grid",
+    label: "Planning baseline",
     payload: {
-      name: "Base wildfire scenario",
+      name: "Planning baseline",
       domain: "wildfire",
       status: "draft",
-      description: "Balanced 10x10 wildfire planning grid.",
+      description: "Balanced preseason planning scenario with mixed fuels, one ignition source, and standard treatment budget assumptions.",
       grid: blankGrid(),
       metadata_json: { region: "Unassigned", owner: "Wildfire West" },
-      constraints_json: { intervention_budget_k: 10, crew_limit: 3, time_horizon_hours: 72, spread_sensitivity: 0.64 },
-      objectives_json: { primary: "minimize propagated ignition exposure" },
+      constraints_json: {
+        intervention_budget_k: 10,
+        crew_limit: 3,
+        time_horizon_hours: 72,
+        spread_sensitivity: 0.64,
+        dryness: 0.62,
+        wind_speed: 0.48,
+        wind_direction: "north_east",
+        spotting_likelihood: 0.08,
+      },
+      objectives_json: { primary: "reduce burn probability and break likely spread corridors" },
     },
   },
   {
     key: "wind",
-    label: "Wind corridor",
+    label: "Canyon wind corridor",
     payload: {
-      name: "Wind corridor scenario",
+      name: "Canyon wind corridor",
       domain: "wildfire",
       status: "draft",
-      description: "North-east corridor with elevated fuel continuity.",
+      description: "Steep corridor where aligned wind can push fire through dense brush and shrub patches toward a treated edge.",
       grid: blankGrid().map((row, rowIndex) =>
         row.map((_, colIndex) => {
           if (rowIndex === 1 && colIndex === 1) return "ignition";
-          if (rowIndex >= 2 && rowIndex <= 6 && colIndex >= 2 && colIndex <= 7) return "dry_brush";
+          if (colIndex === 0 || colIndex === 9) return "road_or_firebreak";
+          if (rowIndex >= 2 && rowIndex <= 6 && colIndex >= 2 && colIndex <= 7) return colIndex % 2 === 0 ? "dry_brush" : "shrub";
           if (colIndex === 8) return "protected";
-          return "tree";
+          return rowIndex >= 7 ? "tree" : "grass";
         }),
       ),
       metadata_json: { region: "Foothill corridor", owner: "Wildfire West" },
-      constraints_json: { intervention_budget_k: 8, crew_limit: 2, time_horizon_hours: 48, spread_sensitivity: 0.72 },
-      objectives_json: { primary: "protect east perimeter assets" },
+      constraints_json: {
+        intervention_budget_k: 10,
+        crew_limit: 2,
+        time_horizon_hours: 48,
+        spread_sensitivity: 0.72,
+        dryness: 0.78,
+        wind_speed: 0.74,
+        wind_direction: "east",
+        spotting_likelihood: 0.12,
+      },
+      objectives_json: { primary: "protect the east perimeter while delaying the canyon ignition front" },
     },
   },
   {
     key: "interface",
-    label: "Community interface",
+    label: "Patchy WUI edge",
     payload: {
-      name: "Community interface scenario",
+      name: "Patchy WUI edge",
       domain: "wildfire",
       status: "draft",
-      description: "Mixed brush and protected edge for intervention planning.",
+      description: "Patchy wildland-urban interface with mixed vegetation, water breaks, and partial hardening near exposed structures.",
       grid: blankGrid().map((row, rowIndex) =>
         row.map((_, colIndex) => {
           if (rowIndex === 2 && colIndex === 2) return "ignition";
-          if (rowIndex >= 1 && rowIndex <= 6 && colIndex >= 1 && colIndex <= 5) return "dry_brush";
+          if (rowIndex >= 1 && rowIndex <= 6 && colIndex >= 1 && colIndex <= 5) return rowIndex % 2 === 0 ? "dry_brush" : "grass";
           if (colIndex >= 7) return "protected";
           if (rowIndex === 8 || rowIndex === 9) return "water";
-          return "tree";
+          return colIndex % 3 === 0 ? "tree" : "shrub";
         }),
       ),
       metadata_json: { region: "Interface zone", owner: "Operations" },
-      constraints_json: { intervention_budget_k: 10, crew_limit: 4, time_horizon_hours: 72, spread_sensitivity: 0.58 },
-      objectives_json: { primary: "reduce exposure near protected edge" },
+      constraints_json: {
+        intervention_budget_k: 10,
+        crew_limit: 4,
+        time_horizon_hours: 72,
+        spread_sensitivity: 0.58,
+        dryness: 0.55,
+        wind_speed: 0.34,
+        wind_direction: "south_east",
+        spotting_likelihood: 0.07,
+      },
+      objectives_json: { primary: "reduce spread into the protected interface edge" },
     },
   },
 ];
@@ -215,16 +243,16 @@ export function ScenarioWorkspacePage() {
       <PageHeader
         eyebrow="Step 1 - Scenario setup"
         title={payload.name}
-        description="Edit the hillside, define the intervention budget, and save a clean scenario version before moving into risk mapping, spread forecasting, and intervention planning."
+        description="Edit fuels, barriers, and ignition points, define planning conditions, and save a clean hillside version before running risk, ensemble spread, and intervention planning."
         actions={
           <>
             {scenarioId ? (
-              <button onClick={() => void archiveScenario()} className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] font-medium text-foreground">
+              <button onClick={() => void archiveScenario()} className="border border-border bg-card px-6 py-2.5 text-[12px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
                 Archive
               </button>
             ) : null}
             {scenarioId ? (
-              <button onClick={() => void deleteScenario()} className="rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-[13px] font-medium text-red-700">
+              <button onClick={() => void deleteScenario()} className="border border-qp-red/40 bg-card px-5 py-2.5 text-[12px] font-bold uppercase tracking-wider text-qp-red hover:bg-qp-red hover:text-white transition-colors">
                 <span className="inline-flex items-center gap-2">
                   <Trash2 className="h-4 w-4" /> Delete
                 </span>
@@ -233,14 +261,14 @@ export function ScenarioWorkspacePage() {
             <button
               onClick={() => void saveScenario()}
               disabled={saving}
-              className="rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] font-medium text-foreground disabled:opacity-50"
+              className="border border-border bg-card px-6 py-2.5 text-[12px] font-bold uppercase tracking-wider text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
             >
               <span className="inline-flex items-center gap-2">
                 <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save"}
               </span>
             </button>
             {scenarioId ? (
-              <Link to={`/app/risk?scenario=${scenarioId}`} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white">
+              <Link to={`/app/risk?scenario=${scenarioId}`} className="border border-transparent bg-primary px-6 py-2.5 text-[12px] font-bold uppercase tracking-wider text-primary-foreground hover:bg-qp-slate transition-colors">
                 <span className="inline-flex items-center gap-2">
                   <Play className="h-4 w-4" /> Continue
                 </span>
@@ -253,11 +281,11 @@ export function ScenarioWorkspacePage() {
       {statusMessage ? <Notice tone={statusMessage.tone} title={statusMessage.title} description={statusMessage.description} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)_300px]">
-        <SectionPanel title="Scenario inputs" subtitle="Templates, planning notes, and the minimum controls needed to set up a wildfire case">
+        <SectionPanel title="Scenario inputs" subtitle="Templates, planning assumptions, and the core controls that define one preseason wildfire planning case">
           <div className="space-y-4 text-[13px]">
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Template</label>
-              <select onChange={(event) => applyTemplate(event.target.value)} defaultValue="" className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none">
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-qp-cyan">Template</label>
+              <select onChange={(event) => applyTemplate(event.target.value)} defaultValue="" className="w-full border border-border bg-card px-4 py-2.5 text-[14px] outline-none focus:border-primary transition-colors">
                 <option value="" disabled>
                   Load a template
                 </option>
@@ -269,24 +297,24 @@ export function ScenarioWorkspacePage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Name</label>
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Name</label>
               <input
                 value={payload.name}
                 onChange={(event) => setPayload((current) => ({ ...current, name: event.target.value }))}
-                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none"
+                className="w-full border border-border bg-card px-4 py-2.5 text-[14px] outline-none focus:border-primary transition-colors"
               />
             </div>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Description</label>
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Description</label>
               <textarea
                 value={payload.description}
                 onChange={(event) => setPayload((current) => ({ ...current, description: event.target.value }))}
-                className="min-h-[90px] w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none"
+                className="min-h-[100px] w-full border border-border bg-card px-4 py-3 text-[14px] leading-relaxed outline-none focus:border-primary transition-colors"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Intervention budget (K)</label>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Intervention budget (K)</label>
                 <input
                   type="number"
                   min={1}
@@ -297,11 +325,11 @@ export function ScenarioWorkspacePage() {
                       constraints_json: { ...current.constraints_json, intervention_budget_k: Number(event.target.value) },
                     }))
                   }
-                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none"
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[14px] font-mono outline-none focus:border-primary transition-colors"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Crew limit</label>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Crew limit</label>
                 <input
                   type="number"
                   min={1}
@@ -312,11 +340,11 @@ export function ScenarioWorkspacePage() {
                       constraints_json: { ...current.constraints_json, crew_limit: Number(event.target.value) },
                     }))
                   }
-                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none"
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[14px] font-mono outline-none focus:border-primary transition-colors"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Planning horizon (hrs)</label>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Planning horizon (hrs)</label>
                 <input
                   type="number"
                   min={1}
@@ -327,11 +355,11 @@ export function ScenarioWorkspacePage() {
                       constraints_json: { ...current.constraints_json, time_horizon_hours: Number(event.target.value) },
                     }))
                   }
-                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none"
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[14px] font-mono outline-none focus:border-primary transition-colors"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Spread sensitivity</label>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Spread sensitivity</label>
                 <input
                   type="number"
                   min={0}
@@ -344,12 +372,91 @@ export function ScenarioWorkspacePage() {
                       constraints_json: { ...current.constraints_json, spread_sensitivity: Number(event.target.value) },
                     }))
                   }
-                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none"
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[14px] font-mono outline-none focus:border-primary transition-colors"
                 />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Dryness</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step="0.01"
+                  value={String(payload.constraints_json.dryness ?? 0.6)}
+                  onChange={(event) =>
+                    setPayload((current) => ({
+                      ...current,
+                      constraints_json: { ...current.constraints_json, dryness: Number(event.target.value) },
+                    }))
+                  }
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[14px] font-mono outline-none focus:border-primary transition-colors"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Wind speed</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step="0.01"
+                  value={String(payload.constraints_json.wind_speed ?? 0.4)}
+                  onChange={(event) =>
+                    setPayload((current) => ({
+                      ...current,
+                      constraints_json: { ...current.constraints_json, wind_speed: Number(event.target.value) },
+                    }))
+                  }
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[14px] font-mono outline-none focus:border-primary transition-colors"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Spotting likelihood</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step="0.01"
+                  value={String(payload.constraints_json.spotting_likelihood ?? 0.08)}
+                  onChange={(event) =>
+                    setPayload((current) => ({
+                      ...current,
+                      constraints_json: { ...current.constraints_json, spotting_likelihood: Number(event.target.value) },
+                    }))
+                  }
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[14px] font-mono outline-none focus:border-primary transition-colors"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Wind direction</label>
+                <select
+                  value={String(payload.constraints_json.wind_direction ?? "east")}
+                  onChange={(event) =>
+                    setPayload((current) => ({
+                      ...current,
+                      constraints_json: { ...current.constraints_json, wind_direction: event.target.value },
+                    }))
+                  }
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[14px] outline-none focus:border-primary transition-colors"
+                >
+                  {[
+                    "north",
+                    "north_east",
+                    "east",
+                    "south_east",
+                    "south",
+                    "south_west",
+                    "west",
+                    "north_west",
+                  ].map((option) => (
+                    <option key={option} value={option}>
+                      {option.replace("_", " ")}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-muted-foreground">Primary objective</label>
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Primary objective</label>
               <input
                 value={String(payload.objectives_json.primary ?? "")}
                 onChange={(event) =>
@@ -358,63 +465,63 @@ export function ScenarioWorkspacePage() {
                     objectives_json: { ...current.objectives_json, primary: event.target.value },
                   }))
                 }
-                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none"
+                className="w-full border border-border bg-card px-4 py-2.5 text-[14px] outline-none focus:border-primary transition-colors"
               />
             </div>
           </div>
         </SectionPanel>
 
-        <SectionPanel title="10x10 hillside grid" subtitle="Choose a cell type, then paint the terrain directly. This grid becomes the source of truth for every later module.">
+        <SectionPanel title="10x10 hillside grid" subtitle="Choose a cell type, then paint fuels, barriers, treatments, and ignition directly onto the hillside. This grid becomes the source of truth for risk, forecast, and optimization.">
           <ScenarioGrid grid={payload.grid} selected={selectedCell} editable onSelect={updateGridCell} brushState={brushState} />
         </SectionPanel>
 
-        <SectionPanel title="Cell legend and inspector" subtitle="Use the legend to mark fuel, barriers, ignition, and protected cells">
-          <div className="space-y-4">
+        <SectionPanel title="Cell legend and inspector" subtitle="Use the legend to mark fuel classes, hard breaks, treatment, and ignition sources">
+          <div className="flex flex-col h-full space-y-5">
             <div className="flex flex-wrap gap-2">
               {CELL_OPTIONS.map((state) => (
                 <button
                   key={state}
                   onClick={() => setBrushState(state)}
-                  className={`rounded-full px-3 py-1.5 text-[12px] transition-all ${
-                    brushState === state ? "bg-qp-navy text-white shadow-sm" : "border border-border bg-white text-muted-foreground hover:bg-slate-50"
+                  className={`border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all ${
+                    brushState === state ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card text-muted-foreground hover:bg-secondary"
                   }`}
                 >
                   {state.replace("_", " ")}
                 </button>
               ))}
             </div>
-            <div className="rounded-2xl border border-border bg-white/80 p-4">
-              <p className="text-[12px] leading-5 text-muted-foreground">
-                Dry brush marks highly flammable fuel, protected marks a hardened or intervention cell, ignition marks the likely fire start, and water or empty cells act as natural breaks.
+            <div className="border border-border bg-card p-4 mt-2">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                <span className="font-bold text-foreground">Dry brush</span> is the fastest-burning fuel, <span className="font-bold text-foreground">grass</span> and <span className="font-bold text-foreground">shrub</span> carry fire differently, <span className="font-bold text-foreground">tree</span> holds more fuel. <span className="font-bold text-foreground">Intervention</span> and <span className="font-bold text-foreground">protected</span> cells reduce ignition probability, and <span className="font-bold text-foreground">water</span> or <span className="font-bold text-foreground">roads</span> act as hard breaks.
               </p>
             </div>
-            <div className="rounded-2xl border border-border bg-white/80 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Selected cell</p>
+            <div className="border border-border bg-card p-5 mt-4 border-l-2 border-l-qp-cyan">
+              <p className="text-[12px] uppercase tracking-[0.15em] font-bold text-muted-foreground mb-3">Selected cell</p>
               {selectedCell ? (
                 <>
-                  <p className="mt-3 text-[16px] font-semibold">
+                  <p className="text-[18px] font-bold text-foreground">
                     Row {selectedCell[0] + 1}, Col {selectedCell[1] + 1}
                   </p>
-                  <p className="mt-1 text-[12px] text-muted-foreground">State: {selectedState?.replace("_", " ")}</p>
+                  <p className="mt-1 text-[13px] text-muted-foreground font-medium">State: <span className="text-foreground">{selectedState?.replace("_", " ")}</span></p>
                 </>
               ) : (
-                <p className="mt-3 text-[13px] text-muted-foreground">Select a cell to inspect it.</p>
+                <p className="text-[13px] text-muted-foreground">Select a cell to inspect it.</p>
               )}
             </div>
             {scenarioId ? (
-              <div className="rounded-2xl border border-border bg-white/80 p-4">
-                <p className="text-[12px] font-medium text-foreground">Next steps</p>
-                <p className="mt-1 text-[12px] text-muted-foreground">
-                  Save first, then move from risk map to spread forecast to intervention planning for this exact hillside version.
+              <div className="border border-border bg-card p-5 mt-4">
+                <p className="text-[12px] uppercase tracking-[0.15em] font-bold text-foreground mb-2">Next steps</p>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  Save first, then move from risk map to spread forecast to intervention planning.
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link to={`/app/risk?scenario=${scenarioId}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link to={`/app/risk?scenario=${scenarioId}`} className="border border-border bg-secondary/50 hover:bg-secondary px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
                     Risk
                   </Link>
-                  <Link to={`/app/forecast?scenario=${scenarioId}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
+                  <Link to={`/app/forecast?scenario=${scenarioId}`} className="border border-border bg-secondary/50 hover:bg-secondary px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
                     Forecast
                   </Link>
-                  <Link to={`/app/optimize?scenario=${scenarioId}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
+                  <Link to={`/app/optimize?scenario=${scenarioId}`} className="border border-border bg-secondary/50 hover:bg-secondary px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
                     Optimize
                   </Link>
                 </div>

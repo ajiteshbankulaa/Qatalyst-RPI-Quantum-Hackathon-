@@ -1,11 +1,15 @@
 export type CellState =
   | "empty"
+  | "road_or_firebreak"
   | "dry_brush"
+  | "grass"
+  | "shrub"
   | "tree"
   | "water"
   | "protected"
   | "intervention"
-  | "ignition";
+  | "ignition"
+  | "burned";
 
 export type Scenario = {
   id: string;

@@ -82,10 +82,10 @@ export function RiskPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Step 2 - Risk Map"
-        title="Early ignition risk classification"
-        description="Train a classical baseline and a real Qiskit QML model on the same wildfire task: predict which cells become ignition points within the early response window."
+        title="Early ignition corridor classification"
+        description="Train a classical baseline and a real Qiskit QML model on the same wildfire task: predict which cells are likely to join an early ignition corridor under the shared ensemble hazard model."
         actions={
-          <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-50">
+          <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="inline-flex items-center justify-center bg-primary px-6 py-3 text-[13px] font-bold uppercase tracking-wider text-primary-foreground transition-all hover:bg-qp-slate disabled:opacity-50">
             {running ? "Running..." : "Run classification"}
           </button>
         }
@@ -98,11 +98,11 @@ export function RiskPage() {
           <SectionPanel title="Task setup" subtitle="Same dataset, same label, same evaluation split">
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px_180px]">
               <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Scenario</label>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Scenario</label>
                 <select
                   value={activeScenarioId}
                   onChange={(event) => setScenarioId(event.target.value)}
-                  className="w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none"
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[13px] outline-none focus:border-primary transition-colors"
                 >
                   {scenarios.map((scenario) => (
                     <option key={scenario.id} value={scenario.id}>
@@ -112,11 +112,11 @@ export function RiskPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Response window</label>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Response window</label>
                 <select
                   value={String(horizonSteps)}
                   onChange={(event) => setHorizonSteps(Number(event.target.value))}
-                  className="w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none"
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[13px] outline-none focus:border-primary transition-colors"
                 >
                   <option value="2">2 steps</option>
                   <option value="3">3 steps</option>
@@ -124,11 +124,11 @@ export function RiskPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Simulation draws</label>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Simulation draws</label>
                 <select
                   value={String(sampleCount)}
                   onChange={(event) => setSampleCount(Number(event.target.value))}
-                  className="w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none"
+                  className="w-full border border-border bg-card px-4 py-2.5 text-[13px] outline-none focus:border-primary transition-colors"
                 >
                   <option value="16">16</option>
                   <option value="24">24</option>
@@ -137,7 +137,7 @@ export function RiskPage() {
               </div>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <MetricTile label="Binary target" value="Ignite" hint="Will this cell ignite inside the response window?" />
+              <MetricTile label="Binary target" value="Corridor" hint="Will this cell join the early ignition corridor?" />
               <MetricTile label="Classical model" value="LogReg" hint="Scaled logistic regression baseline" />
               <MetricTile label="Quantum model" value="QML" hint="Shallow Qiskit variational classifier" />
             </div>
@@ -152,17 +152,17 @@ export function RiskPage() {
                 <MetricTile label="Effective window" value={`${dataset?.effective_label_horizon_steps ?? horizonSteps} steps`} hint="Actual label horizon used to keep the split meaningful" />
               </div>
 
-              <SectionPanel title="Dataset and task" subtitle="Generated from repeated spread simulations on scenario variants">
+              <SectionPanel title="Dataset and task" subtitle="Generated from the same stochastic wildfire model used by forecast and optimization">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl border border-border bg-white/80 p-4">
-                    <p className="text-[13px] font-semibold">Classification target</p>
-                    <p className="mt-2 text-[13px] text-muted-foreground">{run.summary.classification_task}</p>
-                    <p className="mt-2 text-[12px] text-muted-foreground">{dataset?.label_definition}</p>
+                  <div className="border border-border bg-card p-5">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3 border-b border-border pb-2">Classification target</p>
+                    <p className="text-[14px] font-semibold text-foreground mb-1">{run.summary.classification_task}</p>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">{dataset?.label_definition}</p>
                   </div>
-                  <div className="rounded-2xl border border-border bg-white/80 p-4">
-                    <p className="text-[13px] font-semibold">Features</p>
-                    <p className="mt-2 text-[13px] text-muted-foreground">{(dataset?.feature_names ?? []).join(", ")}</p>
-                    <p className="mt-2 text-[12px] text-muted-foreground">{dataset?.dataset_generation}</p>
+                  <div className="border border-border bg-card p-5">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3 border-b border-border pb-2">Features</p>
+                    <p className="text-[14px] font-semibold text-foreground mb-1">{(dataset?.feature_names ?? []).join(", ")}</p>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">{dataset?.dataset_generation}</p>
                   </div>
                 </div>
               </SectionPanel>
@@ -170,21 +170,21 @@ export function RiskPage() {
               <SectionPanel title="Held-out model comparison" subtitle="All models are evaluated on the same test split.">
                 <div className="grid gap-4 lg:grid-cols-3">
                   {(run.summary.comparison as Array<any>).map((item) => (
-                    <div key={item.mode} className="rounded-2xl border border-border bg-white/85 p-4">
-                      <div className="flex items-center justify-between gap-3">
+                    <div key={item.mode} className="border border-border bg-card p-5 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 border-b border-border pb-3 mb-4">
                         <div>
-                          <p className="text-[14px] font-semibold">{modeLabel(item.mode)}</p>
-                          <p className="mt-1 text-[12px] text-muted-foreground">{run.results[item.mode]?.model?.notes}</p>
+                          <p className="text-[15px] font-bold tracking-tight">{modeLabel(item.mode)}</p>
+                          <p className="mt-1 text-[12px] text-muted-foreground italic">{run.results[item.mode]?.model?.notes}</p>
                         </div>
                         <StatusPill label={item.mode === run.summary.recommended_mode ? "Best quality" : item.mode === run.summary.most_practical_mode ? "Most practical" : "Compared"} tone={item.mode === run.summary.recommended_mode ? "good" : "accent"} />
                       </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3 mb-4">
                         <MetricTile label="Accuracy" value={(item.accuracy * 100).toFixed(1)} hint="Held-out split" />
                         <MetricTile label="F1" value={(item.f1 * 100).toFixed(1)} hint="Balanced quality summary" />
                         <MetricTile label="Precision" value={(item.precision * 100).toFixed(1)} hint="Positive prediction quality" />
                         <MetricTile label="Recall" value={(item.recall * 100).toFixed(1)} hint="High-risk cell capture" />
                       </div>
-                      <p className="mt-3 text-[12px] text-muted-foreground">{item.runtime_ms} ms • {item.practicality}</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{item.runtime_ms} ms • {item.practicality}</p>
                     </div>
                   ))}
                 </div>
@@ -203,7 +203,7 @@ export function RiskPage() {
                 ))}
               </div>
 
-              <SectionPanel title="Hotspots and conclusion" subtitle="Highest predicted ignition probabilities for this scenario">
+              <SectionPanel title="Hotspots and conclusion" subtitle="Highest predicted early-corridor probabilities for this scenario">
                 <div className="flex flex-wrap items-center gap-3">
                   <StatusPill label={`Recommended: ${run.summary.recommended_mode}`} tone="good" />
                   <StatusPill label={`Practical: ${run.summary.most_practical_mode}`} tone="accent" />
@@ -211,12 +211,12 @@ export function RiskPage() {
                 <p className="mt-4 text-[13px] text-muted-foreground">{run.summary.conclusion}</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {availableModes.map((mode) => (
-                    <div key={mode} className="rounded-2xl border border-border bg-white/80 p-4">
-                      <p className="text-[13px] font-semibold">{MODE_META[mode].title}</p>
-                      <ul className="mt-3 space-y-2 text-[12px] text-muted-foreground">
+                    <div key={mode} className="border border-border bg-card p-5">
+                      <p className="text-[13px] font-bold uppercase tracking-wide text-foreground border-b border-border pb-2 mb-3">{MODE_META[mode].title}</p>
+                      <ul className="space-y-2 text-[12px] text-muted-foreground leading-relaxed">
                         {(run.results[mode].top_hotspots as Array<any>).slice(0, 4).map((hotspot) => (
                           <li key={`${mode}-${hotspot.row}-${hotspot.col}`}>
-                            Row {hotspot.row + 1}, Col {hotspot.col + 1} • {(hotspot.score * 100).toFixed(0)}% ignition risk
+                            Row <span className="font-semibold text-foreground">{hotspot.row + 1}</span>, Col <span className="font-semibold text-foreground">{hotspot.col + 1}</span> • <span className="text-qp-red">{(hotspot.score * 100).toFixed(0)}% corridor risk</span>
                           </li>
                         ))}
                       </ul>
@@ -227,10 +227,10 @@ export function RiskPage() {
 
               <SectionPanel title="Continue workflow" subtitle="Use this run as the risk evidence for the same hillside version.">
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/app/forecast?scenario=${activeScenarioId}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
+                  <Link to={`/app/forecast?scenario=${activeScenarioId}`} className="border border-border bg-secondary/50 hover:bg-secondary px-5 py-2.5 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
                     Spread forecast
                   </Link>
-                  <Link to={`/app/reports?scenario=${activeScenarioId}&risk=${run.id}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
+                  <Link to={`/app/reports?scenario=${activeScenarioId}&risk=${run.id}`} className="border border-border bg-secondary/50 hover:bg-secondary px-5 py-2.5 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
                     Report with this run
                   </Link>
                 </div>
@@ -239,7 +239,7 @@ export function RiskPage() {
           ) : (
             <EmptyState
               title="No risk classification run yet"
-              description="Run the wildfire classifier comparison to see which cells are predicted to ignite early and whether the classical or quantum model is more useful under current constraints."
+              description="Run the classifier comparison to see which cells are most likely to join an early spread corridor and whether the classical or quantum model is more useful for planning."
             />
           )}
         </div>
@@ -250,20 +250,20 @@ export function RiskPage() {
               <p className="text-[12px] text-muted-foreground">No risk runs saved for this scenario yet.</p>
             ) : (
               (runHistory ?? []).slice(0, 8).map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setRun(item)}
-                  className={`w-full rounded-2xl border p-4 text-left ${run?.id === item.id ? "border-qp-cyan bg-cyan-50/40" : "border-border bg-white/80"}`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[13px] font-semibold">{item.id.slice(0, 8)}</p>
-                      <p className="mt-1 text-[12px] text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
+                  <button
+                    key={item.id}
+                    onClick={() => setRun(item)}
+                    className={`w-full border p-4 text-left transition-colors ${run?.id === item.id ? "border-primary bg-secondary/30" : "border-border bg-card hover:border-primary/50"}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[13px] font-bold">{item.id.slice(0, 8)}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
+                      </div>
+                      <StatusPill label={item.summary?.recommended_mode ?? item.status} tone="accent" />
                     </div>
-                    <StatusPill label={item.summary?.recommended_mode ?? item.status} tone="accent" />
-                  </div>
-                  <p className="mt-2 text-[12px] text-muted-foreground">{item.summary?.classification_task ?? "Binary ignition classification"}</p>
-                </button>
+                    <p className="mt-2 text-[12px] text-muted-foreground leading-relaxed">{item.summary?.classification_task ?? "Binary corridor classification"}</p>
+                  </button>
               ))
             )}
           </div>

@@ -21,6 +21,8 @@ export function OptimizePage() {
 
   const selectedScenario = useMemo(() => scenarios?.find((scenario) => scenario.id === scenarioId) ?? scenarios?.[0], [scenarioId, scenarios]);
   const activeScenarioId = scenarioId || selectedScenario?.id || "";
+  const recommendedPlacements = (run?.results?.recommended_plan?.placements as Array<any> | undefined) ?? [];
+  const placementLookup = Object.fromEntries(recommendedPlacements.map((item) => [`${item.row}-${item.col}`, 1]));
 
   useEffect(() => {
     if (selectedScenario && !scenarioId) {
@@ -33,13 +35,6 @@ export function OptimizePage() {
       setRun(runHistory[0]);
     }
   }, [runHistory, run]);
-
-  const recommendedLabel =
-    run?.summary?.recommended_mode === "quantum_informed_plan"
-      ? "Quantum-informed full-grid plan"
-      : run?.summary?.recommended_mode === "classical_full_plan"
-      ? "Classical full-grid plan"
-      : "Recommended plan";
 
   async function execute() {
     if (!activeScenarioId) return;
@@ -55,7 +50,7 @@ export function OptimizePage() {
       setMessage({
         tone: "success",
         title: "Intervention plan complete",
-        description: `Recommended plan: ${response.summary?.recommended_mode === "quantum_informed_plan" ? "Quantum-informed full-grid plan" : "Classical full-grid plan"}. Full-scale planning stayed classical while the reduced quantum study was evaluated side by side.`,
+        description: "The optimizer recomputed the full-grid plan with the same wildfire semantics used by risk and forecast.",
       });
       await reloadHistory();
     } catch (err) {
@@ -69,20 +64,17 @@ export function OptimizePage() {
     }
   }
 
-  const recommendedPlacements = (run?.results?.recommended_plan?.placements as Array<any> | undefined) ?? [];
-  const placementLookup = Object.fromEntries(recommendedPlacements.map((item) => [`${item.row}-${item.col}`, 1]));
-
   if (loading) return <LoadingState label="Loading optimization workspace..." />;
   if (error || !scenarios) return <EmptyState title="Optimization workspace unavailable" description={error ?? "Could not load scenarios."} />;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Step 4 - Optimize"
-        title="Intervention plan"
-        description="Given 10 interventions, where should we place them to break adjacency-based fire spread pathways through dry brush on the 10x10 hillside?"
+        eyebrow="Step 4 - Intervention Plan"
+        title="Forecast-aware intervention planning"
+        description="Place 10 interventions on the full 10x10 hillside using the same hazard semantics as the forecast. The reduced quantum study remains a benchmarkable subproblem, not a fake full-scale solve."
         actions={
-          <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="rounded-2xl bg-qp-navy px-4 py-2.5 text-[13px] font-medium text-white disabled:opacity-50">
+          <button onClick={() => void execute()} disabled={!activeScenarioId || running} className="inline-flex items-center justify-center bg-primary px-6 py-3 text-[13px] font-bold uppercase tracking-wider text-primary-foreground transition-all hover:bg-qp-slate disabled:opacity-50">
             {running ? "Running..." : "Generate plan"}
           </button>
         }
@@ -92,11 +84,11 @@ export function OptimizePage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
-          <SectionPanel title="Challenge-aligned inputs" subtitle="The full plan enforces the wildfire challenge budget K=10. The reduced quantum study operates on a smaller critical candidate set.">
+          <SectionPanel title="Planning inputs" subtitle="The full-grid plan is classical. The reduced quantum study uses the same hazard-derived candidate ranking.">
             <div className="grid gap-4 lg:grid-cols-3">
               <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Scenario</label>
-                <select value={activeScenarioId} onChange={(event) => setScenarioId(event.target.value)} className="w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none">
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Scenario</label>
+                <select value={activeScenarioId} onChange={(event) => setScenarioId(event.target.value)} className="w-full border border-border bg-card px-4 py-2.5 text-[13px] outline-none focus:border-primary transition-colors">
                   {scenarios.map((scenario) => (
                     <option key={scenario.id} value={scenario.id}>
                       {scenario.name}
@@ -105,12 +97,12 @@ export function OptimizePage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Enforced budget</label>
-                <input value="10 interventions" readOnly className="w-full rounded-2xl border border-border bg-slate-50 px-4 py-2.5 text-[13px] text-foreground outline-none" />
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Budget</label>
+                <input value="K = 10" readOnly className="w-full border border-border bg-secondary/50 px-4 py-2.5 text-[14px] font-mono text-muted-foreground outline-none" />
               </div>
               <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Reduced quantum candidates</label>
-                <input type="number" min={10} max={16} value={reducedCount} onChange={(event) => setReducedCount(Number(event.target.value))} className="w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-[13px] outline-none" />
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Reduced quantum shortlist</label>
+                <input type="number" min={10} max={16} value={reducedCount} onChange={(event) => setReducedCount(Number(event.target.value))} className="w-full border border-border bg-card px-4 py-2.5 text-[14px] font-mono outline-none focus:border-primary transition-colors" />
               </div>
             </div>
           </SectionPanel>
@@ -118,104 +110,59 @@ export function OptimizePage() {
           {run ? (
             <>
               <div className="grid gap-4 md:grid-cols-4">
-                <MetricTile label="Budget enforced" value={`K=${run.summary.budget_enforced_k}`} hint="Full 10x10 classical planning budget" />
-                <MetricTile label="Broken links" value={String(run.summary.broken_adjacency_links)} hint="Flammable adjacency links removed by the recommended plan" />
-                <MetricTile label="Corridor disruption" value={String(run.summary.spread_corridor_disruption)} hint="Reduction in ignition-connected spread pressure" />
-                <MetricTile label="High-risk coverage" value={String(run.summary.coverage_high_risk_cells)} hint="Top critical cells covered by the recommended plan" />
+                <MetricTile label="Burned-area reduction" value={String(run.summary.expected_burned_area_reduction)} hint="Mean ensemble reduction" />
+                <MetricTile label="Burn-probability reduction" value={String(run.summary.burn_probability_reduction)} hint="Peak burn probability drop" />
+                <MetricTile label="Corridor disruption" value={String(run.summary.corridor_disruption)} hint="Adjacency and corridor pressure reduction" />
+                <MetricTile label="Classical/quantum agreement" value={String(run.summary.agreement_between_classical_and_quantum)} hint="Shared placements across both studies" />
               </div>
 
-              <SectionPanel title="Objective and planning split" subtitle="The optimizer now exposes exactly what it is trying to improve and how the full-grid plan differs from the reduced quantum study">
+              <SectionPanel title="Recommended full-grid plan" subtitle="Deployable plan on the full hillside using the shared wildfire model">
+                <ScenarioGrid grid={selectedScenario?.grid ?? []} scoreLookup={placementLookup} />
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <MetricTile label="Before burned area" value={String(run.results.baseline.metrics.mean_final_burned_area)} />
+                  <MetricTile label="After burned area" value={String(run.results.recommended_plan.metrics_after.mean_final_burned_area)} />
+                  <MetricTile label="Before links" value={String(run.results.baseline.metrics.adjacency_links)} />
+                  <MetricTile label="After links" value={String(run.results.recommended_plan.metrics_after.adjacency_links)} />
+                </div>
+              </SectionPanel>
+
+              <SectionPanel title="Classical full-grid vs reduced quantum study" subtitle="The quantum subproblem is derived from the same hazard model but remains explicitly reduced in scope.">
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-border bg-white/80 p-4">
-                    <p className="text-[13px] font-semibold">Full-scale classical plan</p>
-                    <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{run.summary.full_scale_scope}</p>
-                    <p className="mt-3 text-[12px] text-muted-foreground">Objective</p>
-                    <p className="text-[13px] font-medium">{run.summary.objective}</p>
+                  <div className="border border-border bg-card p-5">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3 border-b border-border pb-2">Full-grid classical layer</p>
+                    <p className="text-[13px] leading-relaxed text-foreground">{run.summary.full_scale_scope}</p>
+                    <p className="mt-3 text-[13px] font-semibold text-muted-foreground">Objective after plan: <span className="text-foreground">{run.summary.classical_plan_score}</span></p>
                   </div>
-                  <div className="rounded-2xl border border-border bg-white/80 p-4">
-                    <p className="text-[13px] font-semibold">Reduced quantum study</p>
-                    <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{run.results.quantum.scope.note}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <StatusPill label={`Shortlist ${run.results.quantum.scope.shortlist_count}`} tone="neutral" />
-                      <StatusPill label={`Quantum subgraph ${run.results.quantum.scope.candidate_count}`} tone="accent" />
-                      <StatusPill label={`Study budget ${run.results.quantum.scope.budget}`} tone="neutral" />
+                  <div className="border border-border bg-card p-5">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3 border-b border-border pb-2">Reduced quantum layer</p>
+                    <p className="text-[13px] leading-relaxed text-foreground">{run.summary.reduced_quantum_scope.note}</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <StatusPill label={`Shortlist ${run.summary.reduced_quantum_scope.shortlist_count}`} tone="neutral" />
+                      <StatusPill label={`Subgraph ${run.summary.reduced_quantum_scope.candidate_count}`} tone="accent" />
+                      <StatusPill label={`Approx ratio ${(run.results.quantum.approximation_ratio * 100).toFixed(1)}%`} tone="good" />
                     </div>
                   </div>
                 </div>
               </SectionPanel>
 
-              <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                <SectionPanel title="Recommended placement layout" subtitle="This is the deployable plan on the full 10x10 hillside. Selected cells are scored against the adjacency disruption objective.">
-                  <ScenarioGrid grid={selectedScenario?.grid ?? []} scoreLookup={placementLookup} />
-                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <MetricTile label="Baseline links" value={String(run.results.baseline.metrics.adjacency_links)} />
-                    <MetricTile label="After plan links" value={String(run.results.recommended_plan.metrics_after.adjacency_links)} />
-                    <MetricTile label="Largest cluster before" value={String(run.results.baseline.metrics.largest_component)} />
-                    <MetricTile label="Largest cluster after" value={String(run.results.recommended_plan.metrics_after.largest_component)} />
-                  </div>
-                </SectionPanel>
-
-                <SectionPanel title="Plan comparison" subtitle="The product stays honest: full 10x10 planning is classical, while the quantum study informs a reduced subset only.">
-                  <div className="space-y-3">
-                    <div className="rounded-2xl border border-border bg-white/80 p-4">
-                      <p className="text-[13px] font-semibold">Classical full-grid plan</p>
-                      <p className="mt-2 text-[12px] text-muted-foreground">
-                        Objective after plan: {run.summary.classical_plan_score} • broken links {run.results.classical.improvement.broken_adjacency_links} • corridor disruption{" "}
-                        {run.results.classical.improvement.spread_corridor_disruption}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border bg-white/80 p-4">
-                      <p className="text-[13px] font-semibold">Quantum-informed full-grid plan</p>
-                      <p className="mt-2 text-[12px] text-muted-foreground">
-                        Objective after plan: {run.summary.quantum_informed_plan_score} • broken links {run.results.quantum_informed.improvement.broken_adjacency_links} • corridor disruption{" "}
-                        {run.results.quantum_informed.improvement.spread_corridor_disruption}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-border bg-slate-50/80 p-4">
-                      <p className="text-[13px] font-semibold">Recommended</p>
-                      <p className="mt-1 text-[13px] font-medium text-foreground">{recommendedLabel}</p>
-                      <p className="mt-2 text-[12px] text-muted-foreground">
-                        {run.summary.recommended_mode === "quantum_informed_plan" ? "The reduced quantum study improved the full-grid objective enough to influence the final deployable plan." : "The full-grid classical plan remained stronger, so the quantum study is kept as supporting evidence rather than forced into deployment."}
-                      </p>
-                    </div>
-                  </div>
-                </SectionPanel>
-              </div>
-
-              <SectionPanel title="Placement explanations" subtitle="Each selected cell explains how it disrupts connectivity and whether it also appeared in the reduced quantum study">
-                <div className="space-y-3">
+              <SectionPanel title="Placement explanations" subtitle="Each recommendation is tied to corridor pressure, burn probability, and agreement with the reduced quantum study where applicable.">
+                <div className="space-y-4">
                   {recommendedPlacements.slice(0, budget).map((placement) => (
-                    <div key={`${placement.row}-${placement.col}`} className="rounded-2xl border border-border bg-white/80 p-4">
-                      <p className="text-[13px] font-semibold">
-                        Row {placement.row + 1}, Col {placement.col + 1}
-                      </p>
-                      <p className="mt-1 text-[12px] text-muted-foreground">{placement.reason}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <StatusPill label={`Blocked links ${placement.blocked_links ?? 0}`} tone="good" />
-                        <StatusPill label={`Corridor disruption ${placement.spread_corridor_disruption ?? 0}`} tone="accent" />
-                        {placement.selected_by_quantum ? <StatusPill label="Appears in reduced quantum study" tone="neutral" /> : null}
+                    <div key={`${placement.row}-${placement.col}`} className="border border-border bg-card p-5 border-l-2 border-l-qp-cyan">
+                      <p className="text-[14px] font-bold text-foreground mb-1">Row {placement.row + 1}, Col {placement.col + 1}</p>
+                      <p className="text-[13px] leading-relaxed text-muted-foreground">{placement.reason}</p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <StatusPill label={`Burn prob ${(placement.burn_probability * 100).toFixed(0)}%`} tone="warn" />
+                        <StatusPill label={`Area reduction ${placement.expected_burned_area_reduction}`} tone="good" />
+                        {placement.selected_by_quantum ? <StatusPill label="Supported by reduced quantum study" tone="accent" /> : <StatusPill label="Included in classical full plan" tone="neutral" />}
                       </div>
                     </div>
                   ))}
                 </div>
               </SectionPanel>
-
-              <SectionPanel title="Continue workflow" subtitle="Use this intervention plan in benchmarking or report generation.">
-                <div className="flex flex-wrap gap-2">
-                  <Link to={`/app/benchmarks?scenario=${activeScenarioId}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
-                    Benchmarks
-                  </Link>
-                  <Link to={`/app/reports?scenario=${activeScenarioId}&optimization=${run.id}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
-                    Report with this run
-                  </Link>
-                </div>
-              </SectionPanel>
             </>
           ) : (
-            <EmptyState
-              title="No intervention plan yet"
-              description="Run the optimizer to answer the core challenge question: given 10 interventions, where should they go to break wildfire spread pathways most effectively?"
-            />
+            <EmptyState title="No intervention plan yet" description="Run the optimizer to compare a full-grid classical plan against a reduced quantum-informed study using the shared wildfire hazard model." />
           )}
         </div>
 
@@ -225,22 +172,31 @@ export function OptimizePage() {
               <p className="text-[12px] text-muted-foreground">No optimization runs saved for this scenario yet.</p>
             ) : (
               (runHistory ?? []).slice(0, 8).map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setRun(item)}
-                  className={`w-full rounded-2xl border p-4 text-left ${run?.id === item.id ? "border-qp-cyan bg-cyan-50/40" : "border-border bg-white/80"}`}
-                >
+                <button key={item.id} onClick={() => setRun(item)} className={`w-full border p-4 text-left transition-colors ${run?.id === item.id ? "border-primary bg-secondary/30" : "border-border bg-card hover:border-primary/50"}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[13px] font-semibold">{item.id.slice(0, 8)}</p>
-                      <p className="mt-1 text-[12px] text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
+                      <p className="text-[13px] font-bold">{item.id.slice(0, 8)}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
                     </div>
-                    <StatusPill label={item.summary?.recommended_mode === "quantum_informed_plan" ? "Quantum-informed" : item.summary?.recommended_mode === "classical_full_plan" ? "Classical" : item.status} tone="accent" />
+                    <StatusPill label={item.summary?.recommended_mode ?? item.status} tone="accent" />
                   </div>
                 </button>
               ))
             )}
           </div>
+          {run ? (
+            <div className="mt-8 pt-6 border-t border-border flex flex-col gap-3">
+              <p className="text-[12px] uppercase tracking-[0.15em] font-bold text-foreground">Next steps</p>
+              <div className="flex flex-wrap gap-2">
+                <Link to={`/app/benchmarks?scenario=${activeScenarioId}`} className="border border-border bg-secondary/50 hover:bg-secondary px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
+                  Benchmarks
+                </Link>
+                <Link to={`/app/reports?scenario=${activeScenarioId}&optimization=${run.id}`} className="border border-border bg-secondary/50 hover:bg-secondary px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
+                  Report with this run
+                </Link>
+              </div>
+            </div>
+          ) : null}
         </SectionPanel>
       </div>
     </div>

@@ -47,6 +47,11 @@ export const api = {
     steps?: number;
     dryness?: number;
     spread_sensitivity?: number;
+    wind_speed?: number;
+    slope_influence?: number;
+    spotting_likelihood?: number;
+    ensemble_runs?: number;
+    seed?: number;
     wind_direction?: string;
   }) => request<ForecastRun>("/forecast/run", { method: "POST", body: JSON.stringify(payload) }),
   listForecastRuns: (scenarioId?: string) =>

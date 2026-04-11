@@ -76,19 +76,19 @@ export function BenchmarkDetailPage() {
         <SectionPanel title="How did qBraid transform it?" subtitle="Each strategy changes the intermediate representation and target-preparation profile">
           <div className="grid gap-4 lg:grid-cols-2">
             {strategies.map((strategy) => (
-              <div key={strategy.id} className="rounded-2xl border border-border bg-white/80 p-4">
-                <p className="text-[14px] font-semibold">{strategy.label}</p>
-                <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{strategy.description}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
+              <div key={strategy.id} className="border border-border bg-card p-5 border-l-2 border-l-qp-cyan">
+                <p className="text-[14px] font-bold text-foreground mb-2">{strategy.label}</p>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">{strategy.description}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
                   <StatusPill label={strategy.intermediate_representation} tone="accent" />
                   <StatusPill label={strategy.compile_profile} tone="neutral" />
                   <StatusPill label={strategy.coupling_profile} tone="neutral" />
                 </div>
                 {firstResultByStrategy.get(strategy.id)?.strategy?.qbraid_transform ? (
-                  <div className="mt-4 rounded-xl border border-border bg-slate-50/80 p-3 text-[11px] leading-5 text-muted-foreground">
-                    <p className="font-medium text-foreground">qBraid conversion path</p>
-                    <p>Forward: {(firstResultByStrategy.get(strategy.id).strategy.qbraid_transform.forward_path ?? []).join(" -> ")}</p>
-                    <p>Reverse: {(firstResultByStrategy.get(strategy.id).strategy.qbraid_transform.reverse_path ?? []).join(" -> ")}</p>
+                  <div className="mt-5 border-t border-border pt-4 text-[12px] leading-relaxed text-muted-foreground">
+                    <p className="font-bold uppercase tracking-wider text-foreground mb-2 text-[11px]">qBraid conversion path</p>
+                    <p><span className="font-semibold text-foreground">Forward:</span> {(firstResultByStrategy.get(strategy.id).strategy.qbraid_transform.forward_path ?? []).join(" -> ")}</p>
+                    <p className="mt-1"><span className="font-semibold text-foreground">Reverse:</span> {(firstResultByStrategy.get(strategy.id).strategy.qbraid_transform.reverse_path ?? []).join(" -> ")}</p>
                   </div>
                 ) : null}
               </div>
@@ -101,14 +101,14 @@ export function BenchmarkDetailPage() {
         <SectionPanel title="Which preserved useful performance best?" subtitle="Environment summaries compare quality winners, cost winners, and best tradeoff winners">
           <div className="grid gap-4 lg:grid-cols-3">
             {Object.entries(environmentSummary).map(([environment, summary]) => (
-              <div key={environment} className="rounded-2xl border border-border bg-white/80 p-4">
-                <p className="text-[14px] font-semibold">{environment}</p>
-                <p className="mt-3 text-[12px] text-muted-foreground">Quality leader</p>
-                <p className="text-[13px] font-medium">{String((summary as any).quality_winner?.strategy_label ?? "n/a")}</p>
-                <p className="mt-2 text-[12px] text-muted-foreground">Cost leader</p>
-                <p className="text-[13px] font-medium">{String((summary as any).cost_winner?.strategy_label ?? "n/a")}</p>
-                <p className="mt-2 text-[12px] text-muted-foreground">Best tradeoff</p>
-                <p className="text-[13px] font-medium">{String((summary as any).tradeoff_winner?.strategy_label ?? "n/a")}</p>
+              <div key={environment} className="border border-border bg-card p-5">
+                <p className="text-[13px] font-bold uppercase tracking-wider text-foreground mb-3 border-b border-border pb-2">{environment}</p>
+                <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Quality leader</p>
+                <p className="text-[14px] font-medium text-foreground">{String((summary as any).quality_winner?.strategy_label ?? "n/a")}</p>
+                <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cost leader</p>
+                <p className="text-[14px] font-medium text-foreground">{String((summary as any).cost_winner?.strategy_label ?? "n/a")}</p>
+                <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Best tradeoff</p>
+                <p className="text-[14px] font-medium text-foreground">{String((summary as any).tradeoff_winner?.strategy_label ?? "n/a")}</p>
               </div>
             ))}
           </div>
@@ -117,10 +117,10 @@ export function BenchmarkDetailPage() {
 
       {strategyResults.length > 0 ? (
         <SectionPanel title="What was the cost in compiled resources?" subtitle="Every row combines qBraid strategy, execution environment, output quality, and compiled cost">
-          <div className="overflow-hidden rounded-xl border border-border">
-            <table className="w-full bg-white/90 text-[12px]">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+          <div className="overflow-hidden border border-border bg-card">
+            <table className="w-full text-[12px]">
+              <thead className="bg-secondary/50 border-b border-border">
+                <tr className="text-left text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                   <th className="px-4 py-3">Strategy</th>
                   <th className="px-4 py-3">Intermediate</th>
                   <th className="px-4 py-3">Environment</th>
@@ -168,10 +168,10 @@ export function BenchmarkDetailPage() {
             {strategyResults
               .filter((item: any) => item.artifacts?.job_id)
               .map((item: any) => (
-                <div key={`${item.strategy_key}-${item.environment}`} className="rounded-2xl border border-border bg-white/80 p-4">
-                  <p className="text-[14px] font-semibold">{item.strategy_label}</p>
-                  <p className="mt-2 text-[12px] text-muted-foreground">Backend: {item.execution_notes?.target_backend ?? "n/a"}</p>
-                  <p className="mt-1 text-[12px] text-muted-foreground">Job ID: {item.artifacts?.job_id}</p>
+                <div key={`${item.strategy_key}-${item.environment}`} className="border border-border bg-card p-5">
+                  <p className="text-[14px] font-bold text-foreground mb-2">{item.strategy_label}</p>
+                  <p className="text-[13px] leading-relaxed text-muted-foreground"><span className="font-semibold text-foreground">Backend:</span> {item.execution_notes?.target_backend ?? "n/a"}</p>
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground"><span className="font-semibold text-foreground">Job ID:</span> {item.artifacts?.job_id}</p>
                 </div>
               ))}
           </div>
@@ -180,7 +180,7 @@ export function BenchmarkDetailPage() {
 
       <SectionPanel title="Continue workflow" subtitle="Use this benchmark record as evidence in the final wildfire planning report.">
         <div className="flex flex-wrap gap-2">
-          <Link to={`/app/reports?scenario=${run.scenario_id}&benchmark=${run.id}`} className="rounded-full border border-border px-3 py-1.5 text-[12px] text-foreground">
+          <Link to={`/app/reports?scenario=${run.scenario_id}&benchmark=${run.id}`} className="border border-border bg-secondary/50 hover:bg-secondary px-4 py-2 text-[12px] font-bold uppercase tracking-wider text-foreground transition-colors">
             Report with this run
           </Link>
         </div>

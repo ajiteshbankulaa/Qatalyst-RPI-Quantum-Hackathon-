@@ -6,12 +6,12 @@ import { useAsyncData } from "../useAsyncData";
 
 function DetailRow({ label, value, available }: { label: string; value: string; available?: boolean }) {
   return (
-    <div className="flex items-center justify-between border-b border-border/50 py-2.5 last:border-0">
-      <span className="text-[12px] text-muted-foreground">{label}</span>
+    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
+      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
       <div className="flex items-center gap-2">
-        <span className="text-[12px] font-medium text-foreground">{value}</span>
+        <span className="text-[13px] font-mono font-medium text-foreground">{value}</span>
         {available !== undefined &&
-          (available ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-red-400" />)}
+          (available ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-500" />)}
       </div>
     </div>
   );
@@ -41,7 +41,7 @@ export function IntegrationsPage() {
         title="Integrations unavailable"
         description={error ?? "Could not load integration status."}
         action={
-          <button onClick={() => void reload()} className="rounded-2xl bg-qp-navy px-4 py-2 text-[13px] text-white">
+          <button onClick={() => void reload()} className="bg-primary px-6 py-2.5 text-[12px] font-bold uppercase tracking-wider text-primary-foreground">
             Retry
           </button>
         }
@@ -75,7 +75,7 @@ export function IntegrationsPage() {
                 <StatusPill label={provider.mode} tone={provider.mode === "ready" || provider.mode === "hardware_ready" ? "good" : "neutral"} />
               </div>
 
-              <div className="rounded-xl border border-border bg-white/60 px-4 py-2">
+              <div className="border border-border bg-card px-4 py-2">
                 {provider.provider === "qbraid" && (
                   <>
                     <DetailRow label="SDK installed" value={details.installed ? "Yes" : "No"} available={details.installed} />

@@ -8,12 +8,16 @@ from pydantic import BaseModel
 
 CellState = Literal[
     "empty",
+    "road_or_firebreak",
     "dry_brush",
+    "grass",
+    "shrub",
     "tree",
     "water",
     "protected",
     "intervention",
     "ignition",
+    "burned",
 ]
 
 

@@ -11,7 +11,7 @@ from qiskit import QuantumCircuit
 from qiskit.quantum_info import Statevector
 from scipy.optimize import minimize
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -19,22 +19,29 @@ from sqlalchemy.orm import Session
 
 from app.models import RiskRun, Scenario
 from app.schemas.common import GridCellScore
-from app.services.forecast import _step_spread
-from app.services.spatial import STATE_BASE_RISK, diagonal_neighbors, neighbors
+from app.services.wildfire_model import (
+    CELL_LIBRARY,
+    build_environment,
+    default_environment,
+    local_hazard_features,
+    normalize_grid,
+    run_stochastic_forecast,
+)
 
 logger = logging.getLogger(__name__)
 
 FEATURE_NAMES = [
-    "state_risk",
-    "ignition_pressure",
+    "fuel_load",
+    "base_ignitability",
+    "local_fuel_density",
     "distance_risk",
-    "environmental_force",
+    "wind_exposure",
+    "slope_factor",
+    "treated",
+    "connectivity_proxy",
 ]
-
-FLAMMABLE_STATES = {"dry_brush", "tree", "ignition"}
-BLOCKING_STATES = {"water", "intervention"}
-DEFAULT_HORIZON_STEPS = 2
-DEFAULT_SAMPLE_COUNT = 24
+DEFAULT_HORIZON_STEPS = 3
+DEFAULT_SAMPLE_COUNT = 18
 QML_TRAIN_LIMIT = 96
 
 
@@ -55,125 +62,74 @@ def _clip(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
-def _nearest_ignition_distance(grid: list[list[str]], row: int, col: int) -> float:
-    ignition_cells = [(r, c) for r, line in enumerate(grid) for c, state in enumerate(line) if state == "ignition"]
-    if not ignition_cells:
-        return float(len(grid) * 2)
-    return min(abs(row - ir) + abs(col - ic) for ir, ic in ignition_cells)
-
-
-def _wind_alignment(grid: list[list[str]], row: int, col: int, wind_direction: str) -> float:
-    wind_vectors = {
-        "N": (-1, 0),
-        "S": (1, 0),
-        "E": (0, 1),
-        "W": (0, -1),
-        "NE": (-1, 1),
-        "NW": (-1, -1),
-        "SE": (1, 1),
-        "SW": (1, -1),
-    }
-    ignition_cells = [(r, c) for r, line in enumerate(grid) for c, state in enumerate(line) if state == "ignition"]
-    if not ignition_cells:
-        return 0.0
-    nearest = min(ignition_cells, key=lambda item: abs(item[0] - row) + abs(item[1] - col))
-    dr = row - nearest[0]
-    dc = col - nearest[1]
-    norm = math.sqrt(dr * dr + dc * dc)
-    if norm == 0:
-        return 1.0
-    wr, wc = wind_vectors[wind_direction]
-    alignment = ((dr / norm) * wr + (dc / norm) * wc + 1.0) / 2.0
-    return float(_clip(alignment, 0.0, 1.0))
-
-
-def _cell_feature_vector(grid: list[list[str]], row: int, col: int, profile: dict) -> np.ndarray:
-    size = len(grid)
-    state = grid[row][col]
-    direct = neighbors(row, col, size)
-    diagonal = diagonal_neighbors(row, col, size)
-    direct_ignition = sum(1 for nr, nc in direct if grid[nr][nc] == "ignition")
-    diagonal_ignition = sum(1 for nr, nc in diagonal if grid[nr][nc] == "ignition")
-    ignition_pressure = _clip((direct_ignition + 0.5 * diagonal_ignition) / 6.0, 0.0, 1.0)
-    distance = _nearest_ignition_distance(grid, row, col)
-    distance_risk = 1.0 - _clip(distance / max(1.0, (size - 1) * 2.0), 0.0, 1.0)
-    wind_alignment = _wind_alignment(grid, row, col, profile["wind_direction"])
-    environmental_force = _clip(
-        0.4 * profile["dryness"] + 0.35 * profile["spread_sensitivity"] + 0.25 * wind_alignment,
-        0.0,
-        1.0,
-    )
-    return np.array(
-        [
-            STATE_BASE_RISK[state],
-            ignition_pressure,
-            distance_risk,
-            environmental_force,
-        ],
-        dtype=float,
-    )
-
-
-def _sample_profiles(sample_count: int, horizon_steps: int, seed: int) -> list[dict]:
+def _variant_grid(base_grid: list[list[str]], seed: int) -> list[list[str]]:
     rng = np.random.default_rng(seed)
-    winds = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+    grid = normalize_grid(base_grid)
+    for row, line in enumerate(grid):
+        for col, state in enumerate(line):
+            roll = float(rng.random())
+            if state == "dry_brush":
+                if roll < 0.08:
+                    grid[row][col] = "grass"
+                elif roll < 0.14:
+                    grid[row][col] = "shrub"
+                elif roll < 0.19:
+                    grid[row][col] = "protected"
+            elif state == "tree":
+                if roll < 0.08:
+                    grid[row][col] = "shrub"
+                elif roll < 0.14:
+                    grid[row][col] = "grass"
+            elif state == "empty" and roll < 0.08:
+                grid[row][col] = "grass"
+            elif state == "protected" and roll < 0.05:
+                grid[row][col] = "intervention"
+    return grid
+
+
+def _sample_profiles(base_environment: dict, sample_count: int, horizon_steps: int, seed: int) -> list[dict]:
+    rng = np.random.default_rng(seed)
+    directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     profiles: list[dict] = []
     for idx in range(sample_count):
         profiles.append(
             {
                 "profile_id": idx,
                 "horizon_steps": horizon_steps,
-                "dryness": round(float(rng.uniform(0.45, 0.95)), 3),
-                "spread_sensitivity": round(float(rng.uniform(0.45, 0.9)), 3),
-                "wind_direction": str(rng.choice(winds)),
+                "dryness": round(float(_clip(base_environment["dryness"] + rng.normal(0.0, 0.05), 0.25, 0.98)), 3),
+                "spread_sensitivity": round(float(_clip(base_environment["spread_sensitivity"] + rng.normal(0.0, 0.05), 0.25, 0.98)), 3),
+                "wind_speed": round(float(_clip(base_environment["wind_speed"] + rng.normal(0.0, 0.06), 0.15, 1.0)), 3),
+                "wind_direction": str(rng.choice(directions)),
+                "spotting_likelihood": round(float(_clip(base_environment["spotting_likelihood"] + rng.normal(0.0, 0.02), 0.0, 0.2)), 3),
+                "slope_influence": round(float(base_environment["slope_influence"]), 3),
             }
         )
     return profiles
 
 
-def _variant_grid(base_grid: list[list[str]], seed: int) -> list[list[str]]:
-    rng = np.random.default_rng(seed)
-    grid = [row[:] for row in base_grid]
-    for row, line in enumerate(grid):
-        for col, state in enumerate(line):
-            roll = float(rng.random())
-            if state == "dry_brush":
-                if roll < 0.08:
-                    grid[row][col] = "protected"
-                elif roll < 0.18:
-                    grid[row][col] = "tree"
-                elif roll < 0.22:
-                    grid[row][col] = "empty"
-            elif state == "tree":
-                if roll < 0.08:
-                    grid[row][col] = "protected"
-                elif roll < 0.16:
-                    grid[row][col] = "dry_brush"
-            elif state == "empty" and roll < 0.08:
-                grid[row][col] = "dry_brush"
-    return grid
+def _cell_feature_vector(grid: list[list[str]], row: int, col: int, environment: dict) -> np.ndarray:
+    features = local_hazard_features(grid, row, col, environment)
+    return np.array(
+        [
+            features["fuel_load"],
+            features["base_ignitability"],
+            features["local_fuel_density"],
+            features["distance_risk"],
+            features["wind_exposure"],
+            features["slope_factor"],
+            features["treated"],
+            features["connectivity_proxy"],
+        ],
+        dtype=float,
+    )
 
 
-def _simulate_ignition_labels(grid: list[list[str]], profile: dict, horizon_steps: int) -> np.ndarray:
-    size = len(grid)
-    current = [row[:] for row in grid]
-    first_ignition = np.full((size, size), fill_value=horizon_steps + 1, dtype=int)
-    for row in range(size):
-        for col in range(size):
-            if current[row][col] == "ignition":
-                first_ignition[row, col] = 0
-
-    for step in range(1, horizon_steps + 1):
-        next_grid = _step_spread(current, profile["dryness"], profile["spread_sensitivity"], profile["wind_direction"])
-        for row in range(size):
-            for col in range(size):
-                if first_ignition[row, col] <= horizon_steps:
-                    continue
-                if current[row][col] != "ignition" and next_grid[row][col] == "ignition":
-                    first_ignition[row, col] = step
-        current = next_grid
-
-    return (first_ignition <= horizon_steps).astype(int)
+def _ensemble_labels(grid: list[list[str]], environment: dict, horizon_steps: int, seed: int) -> np.ndarray:
+    forecast = run_stochastic_forecast(grid, environment, steps=horizon_steps, seed=seed, runs=12)
+    label_grid = np.zeros((len(grid), len(grid[0])), dtype=int)
+    for cell in forecast["burn_probability_map"]:
+        label_grid[cell["row"], cell["col"]] = int(cell["probability"] >= 0.45)
+    return label_grid
 
 
 def _build_dataset(
@@ -183,35 +139,37 @@ def _build_dataset(
     threshold: float,
     seed: int,
 ) -> DatasetBundle:
-    profiles = _sample_profiles(sample_count, horizon_steps, seed)
+    base_environment = default_environment(scenario)
+    profiles = _sample_profiles(base_environment, sample_count, horizon_steps, seed)
+    normalized_scenario = normalize_grid(scenario.grid)
     effective_horizon = horizon_steps
-    scoring_samples: list[np.ndarray] = []
-    scoring_refs: list[tuple[int, int, str]] = []
     features: list[np.ndarray]
     labels: list[int]
+    scoring_samples: list[np.ndarray] = []
+    scoring_refs: list[tuple[int, int, str]] = []
 
     while True:
         features = []
         labels = []
         for profile in profiles:
-            training_grid = _variant_grid(scenario.grid, seed + profile["profile_id"] * 101)
-            labels_grid = _simulate_ignition_labels(training_grid, profile, effective_horizon)
+            training_grid = _variant_grid(normalized_scenario, seed + profile["profile_id"] * 31)
+            environment = build_environment(base_environment, **profile)
+            labels_grid = _ensemble_labels(training_grid, environment, effective_horizon, seed + profile["profile_id"] * 97)
             for row, line in enumerate(training_grid):
                 for col, state in enumerate(line):
-                    vector = _cell_feature_vector(training_grid, row, col, profile)
-                    features.append(vector)
+                    features.append(_cell_feature_vector(training_grid, row, col, environment))
                     labels.append(int(labels_grid[row, col]))
-        class_counts = np.bincount(np.asarray(labels, dtype=int), minlength=2)
-        if (len(np.unique(labels)) > 1 and int(class_counts.min()) >= 2) or effective_horizon <= 1:
+        counts = np.bincount(np.asarray(labels, dtype=int), minlength=2)
+        if (len(np.unique(labels)) > 1 and int(counts.min()) >= 2) or effective_horizon <= 1:
             break
         effective_horizon -= 1
 
-    for profile in profiles:
-        for row, line in enumerate(scenario.grid):
-            for col, state in enumerate(line):
-                vector = _cell_feature_vector(scenario.grid, row, col, profile)
-                scoring_samples.append(vector)
-                scoring_refs.append((row, col, state))
+    scoring_environment = build_environment(base_environment)
+    preview = run_stochastic_forecast(normalized_scenario, scoring_environment, steps=effective_horizon, seed=seed, runs=16)
+    for row, line in enumerate(normalized_scenario):
+        for col, state in enumerate(line):
+            scoring_samples.append(_cell_feature_vector(normalized_scenario, row, col, scoring_environment))
+            scoring_refs.append((row, col, state))
 
     x = np.asarray(features, dtype=float)
     y = np.asarray(labels, dtype=int)
@@ -222,23 +180,23 @@ def _build_dataset(
         random_state=seed,
         stratify=y if len(np.unique(y)) > 1 else None,
     )
-    scoring_x = np.asarray(scoring_samples, dtype=float)
     summary = {
-        "classification_task": f"Predict whether a cell ignites within the early response window (up to {effective_horizon} steps).",
+        "classification_task": f"Predict whether a cell belongs to the early ignition corridor within {effective_horizon} forecast steps.",
         "effective_label_horizon_steps": effective_horizon,
-        "label_definition": f"label=1 when a cell enters ignition state by step {effective_horizon} under the sampled spread profile.",
+        "label_definition": f"label=1 when ensemble burn probability is at least 0.45 by step {effective_horizon}.",
         "feature_names": FEATURE_NAMES,
         "sample_count": int(len(y)),
         "positive_samples": int(y.sum()),
         "negative_samples": int(len(y) - int(y.sum())),
-        "positive_rate": round(float(y.mean()), 4) if len(y) else 0.0,
+        "positive_rate": round(float(y.mean()), 4),
         "train_samples": int(len(train_y)),
         "test_samples": int(len(test_y)),
-        "scenario_cell_count": int(len(scenario.grid) * len(scenario.grid[0])),
-        "sampled_profiles": profiles,
-        "dataset_generation": "Monte Carlo wildfire spread simulations on reproducible scenario variants derived from the selected hillside.",
         "requested_horizon_steps": horizon_steps,
+        "dataset_generation": "Labels are generated from the shared stochastic wildfire ensemble model under varied planning conditions.",
+        "sampled_profiles": profiles,
         "decision_threshold": threshold,
+        "preview_burn_probability_map": preview["burn_probability_map"],
+        "preview_likely_corridors": preview["summary"]["likely_spread_corridors"],
     }
     return DatasetBundle(
         feature_names=FEATURE_NAMES,
@@ -246,7 +204,7 @@ def _build_dataset(
         test_x=test_x,
         train_y=train_y,
         test_y=test_y,
-        scoring_x=scoring_x,
+        scoring_x=np.asarray(scoring_samples, dtype=float),
         scoring_refs=scoring_refs,
         profiles=profiles,
         summary=summary,
@@ -260,35 +218,26 @@ def _classification_metrics(y_true: np.ndarray, probabilities: np.ndarray, thres
         "precision": round(float(precision_score(y_true, predictions, zero_division=0)), 4),
         "recall": round(float(recall_score(y_true, predictions, zero_division=0)), 4),
         "f1": round(float(f1_score(y_true, predictions, zero_division=0)), 4),
+        "auroc": round(float(roc_auc_score(y_true, probabilities)), 4) if len(np.unique(y_true)) > 1 else None,
         "positive_prediction_rate": round(float(predictions.mean()), 4),
         "runtime_ms": round(float(runtime_ms), 2),
     }
 
 
-def _grid_scores_from_probabilities(
-    probabilities: np.ndarray,
-    refs: list[tuple[int, int, str]],
-    profile_count: int,
-) -> tuple[list[dict], list[dict]]:
-    cell_scores: dict[tuple[int, int, str], list[float]] = {}
-    for probability, ref in zip(probabilities, refs, strict=False):
-        cell_scores.setdefault(ref, []).append(float(probability))
-
+def _grid_scores_from_probabilities(probabilities: np.ndarray, refs: list[tuple[int, int, str]]) -> tuple[list[dict], list[dict]]:
     scores: list[GridCellScore] = []
-    for (row, col, state), values in cell_scores.items():
-        score = float(np.mean(values[:profile_count]))
-        confidence = float(min(1.0, abs(score - 0.5) * 2.0))
+    for probability, (row, col, state) in zip(probabilities, refs, strict=False):
+        confidence = min(1.0, abs(float(probability) - 0.5) * 2.0)
         scores.append(
             GridCellScore(
                 row=row,
                 col=col,
                 state=state,
-                score=round(score, 4),
-                confidence=round(confidence, 4),
+                score=round(float(probability), 4),
+                confidence=round(float(confidence), 4),
             )
         )
-
-    top_hotspots = sorted(scores, key=lambda item: item.score, reverse=True)[:8]
+    top_hotspots = sorted(scores, key=lambda item: item.score, reverse=True)[:10]
     return [item.model_dump() for item in scores], [item.model_dump() for item in top_hotspots]
 
 
@@ -298,13 +247,8 @@ def _balanced_subset(x: np.ndarray, y: np.ndarray, limit: int, seed: int) -> tup
     if len(positives) == 0 or len(negatives) == 0 or len(y) <= limit:
         return x, y
     rng = np.random.default_rng(seed)
-    class_take = max(1, min(len(positives), len(negatives), limit // 2))
-    chosen = np.concatenate(
-        [
-            rng.choice(positives, size=class_take, replace=False),
-            rng.choice(negatives, size=class_take, replace=False),
-        ]
-    )
+    take = max(1, min(len(positives), len(negatives), limit // 2))
+    chosen = np.concatenate([rng.choice(positives, size=take, replace=False), rng.choice(negatives, size=take, replace=False)])
     rng.shuffle(chosen)
     return x[chosen], y[chosen]
 
@@ -317,7 +261,8 @@ class VariationalQuantumClassifier:
         self.training_samples = 0
 
     def _normalize(self, x: np.ndarray) -> np.ndarray:
-        return np.clip(np.tanh(self.scaler.transform(x)), -1.0, 1.0)
+        scaled = self.scaler.transform(x[:, :4])
+        return np.clip(np.tanh(scaled), -1.0, 1.0)
 
     def _probability(self, vector: np.ndarray, parameters: np.ndarray) -> float:
         circuit = QuantumCircuit(2)
@@ -337,7 +282,7 @@ class VariationalQuantumClassifier:
         return float(probabilities[2] + probabilities[3])
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> None:
-        self.scaler.fit(x)
+        self.scaler.fit(x[:, :4])
         normalized = self._normalize(x)
         rng = np.random.default_rng(self.seed)
         self.parameters = rng.uniform(-math.pi, math.pi, size=6)
@@ -346,20 +291,12 @@ class VariationalQuantumClassifier:
         def objective(parameters: np.ndarray) -> float:
             predictions = np.array([self._probability(vector, parameters) for vector in normalized], dtype=float)
             bounded = np.clip(predictions, 1e-5, 1 - 1e-5)
-            losses = -(y * np.log(bounded) + (1 - y) * np.log(1 - bounded))
-            return float(np.mean(losses))
+            return float(np.mean(-(y * np.log(bounded) + (1 - y) * np.log(1 - bounded))))
 
-        result = minimize(
-            objective,
-            self.parameters,
-            method="COBYLA",
-            options={"maxiter": 40, "rhobeg": 0.6},
-        )
-        if result.success:
-            self.parameters = result.x
-        else:
+        result = minimize(objective, self.parameters, method="COBYLA", options={"maxiter": 40, "rhobeg": 0.6})
+        self.parameters = result.x
+        if not result.success:
             logger.warning("QML optimization did not fully converge: %s", result.message)
-            self.parameters = result.x
 
     def predict_proba(self, x: np.ndarray) -> np.ndarray:
         normalized = self._normalize(x)
@@ -368,17 +305,11 @@ class VariationalQuantumClassifier:
 
 def _run_classical(dataset: DatasetBundle, threshold: float) -> dict:
     started = perf_counter()
-    model = Pipeline(
-        steps=[
-            ("scaler", StandardScaler()),
-            ("classifier", LogisticRegression(max_iter=400, class_weight="balanced")),
-        ]
-    )
+    model = Pipeline([("scaler", StandardScaler()), ("classifier", LogisticRegression(max_iter=400, class_weight="balanced"))])
     model.fit(dataset.train_x, dataset.train_y)
     test_probabilities = model.predict_proba(dataset.test_x)[:, 1]
     scoring_probabilities = model.predict_proba(dataset.scoring_x)[:, 1]
-    metrics = _classification_metrics(dataset.test_y, test_probabilities, threshold, (perf_counter() - started) * 1000)
-    grid_scores, top_hotspots = _grid_scores_from_probabilities(scoring_probabilities, dataset.scoring_refs, len(dataset.profiles))
+    grid_scores, top_hotspots = _grid_scores_from_probabilities(scoring_probabilities, dataset.scoring_refs)
     return {
         "mode": "classical",
         "task": dataset.summary["classification_task"],
@@ -386,15 +317,15 @@ def _run_classical(dataset: DatasetBundle, threshold: float) -> dict:
         "model": {
             "family": "logistic_regression",
             "source": "scikit-learn",
-            "notes": "Linear probabilistic baseline trained on the wildfire ignition classification dataset.",
+            "notes": "Planning-grade baseline trained on ensemble-derived ignition-corridor labels from the shared wildfire model.",
         },
         "grid_scores": grid_scores,
         "top_hotspots": top_hotspots,
         "metrics": {
-            **metrics,
+            **_classification_metrics(dataset.test_y, test_probabilities, threshold, (perf_counter() - started) * 1000),
             "training_samples": int(len(dataset.train_y)),
             "test_samples": int(len(dataset.test_y)),
-            "practicality": "Most practical baseline for repeat planning runs.",
+            "practicality": "Fastest and most repeatable model for scenario analysis.",
         },
         "_test_probabilities": test_probabilities.tolist(),
         "_scoring_probabilities": scoring_probabilities.tolist(),
@@ -404,30 +335,29 @@ def _run_classical(dataset: DatasetBundle, threshold: float) -> dict:
 def _run_quantum(dataset: DatasetBundle, threshold: float, seed: int) -> dict:
     started = perf_counter()
     train_x, train_y = _balanced_subset(dataset.train_x, dataset.train_y, QML_TRAIN_LIMIT, seed)
-    model = VariationalQuantumClassifier(seed=seed)
+    model = VariationalQuantumClassifier(seed)
     model.fit(train_x, train_y)
     test_probabilities = model.predict_proba(dataset.test_x)
     scoring_probabilities = model.predict_proba(dataset.scoring_x)
-    metrics = _classification_metrics(dataset.test_y, test_probabilities, threshold, (perf_counter() - started) * 1000)
-    grid_scores, top_hotspots = _grid_scores_from_probabilities(scoring_probabilities, dataset.scoring_refs, len(dataset.profiles))
+    grid_scores, top_hotspots = _grid_scores_from_probabilities(scoring_probabilities, dataset.scoring_refs)
     return {
         "mode": "quantum",
         "task": dataset.summary["classification_task"],
-        "feature_names": dataset.feature_names,
+        "feature_names": dataset.feature_names[:4],
         "model": {
             "family": "variational_quantum_classifier",
             "source": "qiskit",
             "qubits": 2,
             "ansatz_depth": 2,
-            "notes": "Shallow Qiskit variational classifier trained on the same task using a balanced reduced training subset for near-term practicality.",
+            "notes": "Shallow VQC on a reduced feature subset chosen from the same shared wildfire semantics.",
         },
         "grid_scores": grid_scores,
         "top_hotspots": top_hotspots,
         "metrics": {
-            **metrics,
+            **_classification_metrics(dataset.test_y, test_probabilities, threshold, (perf_counter() - started) * 1000),
             "training_samples": int(model.training_samples),
             "test_samples": int(len(dataset.test_y)),
-            "practicality": "Meaningful QML baseline, but slower and trained on a reduced subset to stay practical.",
+            "practicality": "Real QML comparator, but slower and limited to a compact feature subset.",
         },
         "_test_probabilities": test_probabilities.tolist(),
         "_scoring_probabilities": scoring_probabilities.tolist(),
@@ -436,49 +366,22 @@ def _run_quantum(dataset: DatasetBundle, threshold: float, seed: int) -> dict:
 
 def _run_hybrid(classical: dict, quantum: dict, dataset: DatasetBundle, threshold: float) -> dict:
     started = perf_counter()
-    hybrid_test_probabilities = np.clip(
-        (
-            np.asarray(classical["_test_probabilities"], dtype=float)
-            + np.asarray(quantum["_test_probabilities"], dtype=float)
-        )
-        / 2.0,
-        0.0,
-        1.0,
-    )
-    metrics = _classification_metrics(dataset.test_y, hybrid_test_probabilities, threshold, (perf_counter() - started) * 1000)
-    hybrid_scoring = np.clip(
-        (
-            np.asarray(classical["_scoring_probabilities"], dtype=float)
-            + np.asarray(quantum["_scoring_probabilities"], dtype=float)
-        )
-        / 2.0,
-        0.0,
-        1.0,
-    )
-    combined_scores, top_hotspots = _grid_scores_from_probabilities(
-        hybrid_scoring,
-        dataset.scoring_refs,
-        len(dataset.profiles),
-    )
+    test_probs = np.clip((np.asarray(classical["_test_probabilities"]) + np.asarray(quantum["_test_probabilities"])) / 2.0, 0.0, 1.0)
+    scoring_probs = np.clip((np.asarray(classical["_scoring_probabilities"]) + np.asarray(quantum["_scoring_probabilities"])) / 2.0, 0.0, 1.0)
+    grid_scores, top_hotspots = _grid_scores_from_probabilities(scoring_probs, dataset.scoring_refs)
     return {
         "mode": "hybrid",
         "task": dataset.summary["classification_task"],
         "feature_names": dataset.feature_names,
-        "model": {
-            "family": "probability_ensemble",
-            "source": "classical+qiskit",
-            "notes": "Average of classical and quantum ignition probabilities on the same cells.",
-        },
-        "grid_scores": combined_scores,
+        "model": {"family": "probability_ensemble", "source": "classical+qiskit", "notes": "Average of classical and QML probabilities on the same corridor task."},
+        "grid_scores": grid_scores,
         "top_hotspots": top_hotspots,
         "metrics": {
-            **metrics,
+            **_classification_metrics(dataset.test_y, test_probs, threshold, (perf_counter() - started) * 1000),
             "training_samples": int(dataset.summary["train_samples"]),
             "test_samples": int(len(dataset.test_y)),
-            "practicality": "Useful reconciliation layer when teams want agreement between the two baselines.",
+            "practicality": "Useful when analysts want conservative agreement across the two modeling styles.",
         },
-        "_test_probabilities": hybrid_test_probabilities.tolist(),
-        "_scoring_probabilities": hybrid_scoring.tolist(),
     }
 
 
@@ -492,74 +395,51 @@ def create_risk_run(db: Session, scenario: Scenario, payload: dict) -> RiskRun:
     horizon_steps = int(payload.get("horizon_steps", DEFAULT_HORIZON_STEPS))
     sample_count = int(payload.get("sample_count", DEFAULT_SAMPLE_COUNT))
     seed = int(payload.get("seed", 17))
-    logger.info("Running ML/QML risk analysis for scenario %s with modes %s", scenario.id, modes)
-
     dataset = _build_dataset(scenario, horizon_steps, sample_count, threshold, seed)
 
-    classical_result = _run_classical(dataset, threshold) if "classical" in modes or "hybrid" in modes else None
-    quantum_result = _run_quantum(dataset, threshold, seed) if "quantum" in modes or "hybrid" in modes else None
+    classical = _run_classical(dataset, threshold)
+    quantum = _run_quantum(dataset, threshold, seed)
+    hybrid = _run_hybrid(classical, quantum, dataset, threshold)
+    raw_results = {"classical": classical, "quantum": quantum, "hybrid": hybrid}
+    results = {mode: _public_result(raw_results[mode]) for mode in modes}
 
-    results: dict[str, dict] = {}
-    if classical_result is not None and "classical" in modes:
-        results["classical"] = _public_result(classical_result)
-    if quantum_result is not None and "quantum" in modes:
-        results["quantum"] = _public_result(quantum_result)
-    if "hybrid" in modes and classical_result is not None and quantum_result is not None:
-        results["hybrid"] = _public_result(_run_hybrid(classical_result, quantum_result, dataset, threshold))
-
-    comparison = []
-    for mode, result in results.items():
-        comparison.append(
-            {
-                "mode": mode,
-                "accuracy": result["metrics"]["accuracy"],
-                "precision": result["metrics"]["precision"],
-                "recall": result["metrics"]["recall"],
-                "f1": result["metrics"]["f1"],
-                "runtime_ms": result["metrics"]["runtime_ms"],
-                "practicality": result["metrics"]["practicality"],
-            }
-        )
-
-    best_accuracy_mode = max(comparison, key=lambda item: (item["f1"], item["accuracy"]))["mode"]
-    classical_item = next((item for item in comparison if item["mode"] == "classical"), None)
-    best_item = next(item for item in comparison if item["mode"] == best_accuracy_mode)
-    if classical_item and best_item["f1"] - classical_item["f1"] <= 0.03:
-        recommended_mode = "classical"
-    else:
-        recommended_mode = best_accuracy_mode
-    most_practical_mode = "classical" if classical_item else best_accuracy_mode
-    conclusion = (
-        f"{recommended_mode.title()} delivered the strongest ignition classification on the held-out test split. "
-        f"Classical logistic regression remains the most practical operational baseline, while the Qiskit QML model provides a real near-term comparator rather than a handcrafted quantum-style score."
-    )
+    comparison = [
+        {
+            "mode": mode,
+            "accuracy": results[mode]["metrics"]["accuracy"],
+            "precision": results[mode]["metrics"]["precision"],
+            "recall": results[mode]["metrics"]["recall"],
+            "f1": results[mode]["metrics"]["f1"],
+            "auroc": results[mode]["metrics"]["auroc"],
+            "runtime_ms": results[mode]["metrics"]["runtime_ms"],
+            "practicality": results[mode]["metrics"]["practicality"],
+        }
+        for mode in modes
+    ]
+    best_mode = max(comparison, key=lambda item: (item["f1"], item["accuracy"]))["mode"]
+    recommended_mode = "classical" if best_mode != "classical" and results["classical"]["metrics"]["f1"] >= results[best_mode]["metrics"]["f1"] - 0.03 else best_mode
     summary = {
         "recommended_mode": recommended_mode,
-        "most_practical_mode": most_practical_mode,
+        "most_practical_mode": "classical",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "classification_task": dataset.summary["classification_task"],
         "dataset": dataset.summary,
         "comparison": comparison,
-        "conclusion": conclusion,
-    }
-    request_payload = {
-        "scenario_id": scenario.id,
-        "modes": modes,
-        "threshold": threshold,
-        "horizon_steps": horizon_steps,
-        "sample_count": sample_count,
-        "seed": seed,
+        "conclusion": (
+            f"{recommended_mode.title()} produced the strongest planning-grade corridor classification on the held-out split. "
+            "The labels, forecast assumptions, and optimization semantics now all come from the same shared wildfire model."
+        ),
+        "planning_grade_note": "Comparative scenario-analysis model for pre-season planning. It should not be used as an operational fire prediction system.",
     }
     run = RiskRun(
         scenario_id=scenario.id,
         scenario_version=scenario.version,
         modes_json=modes,
-        request_json=request_payload,
+        request_json={"scenario_id": scenario.id, "modes": modes, "threshold": threshold, "horizon_steps": horizon_steps, "sample_count": sample_count, "seed": seed},
         results_json=results,
         summary_json=summary,
     )
     db.add(run)
     db.commit()
     db.refresh(run)
-    logger.info("Risk run %s complete", run.id)
     return run
