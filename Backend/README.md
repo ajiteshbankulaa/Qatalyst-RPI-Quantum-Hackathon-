@@ -102,16 +102,24 @@ This backend is designed for preseason or scenario-analysis planning. It is not 
 
 The optimization engine is now explicitly challenge-aligned:
 
-- The deployable plan is built on the full 10x10 grid.
-- Spread pathways are defined by orthogonal adjacency on flammable cells under the shared wildfire semantics.
-- The enforced deployment budget is `K=10`.
-- Better plans are the ones that break more adjacency links, shrink the largest flammable cluster, reduce ignition-connected spread corridors, and lower expected burned area under ensemble forecast conditions.
+- `planning` mode:
+  - keeps the deployable plan on the full 10x10 grid
+  - uses the shared wildfire forecast model in the objective loop
+  - combines adjacency disruption with expected burned-area reduction and corridor pressure
+  - only marks a plan as `recommended` if it does not worsen burned-area outcomes beyond the safety tolerance
+- `challenge` mode:
+  - keeps the same 10x10 grid and strict `K=10`
+  - builds the challenge graph from adjacency among `dry_brush` and `ignition` cells
+  - exposes the challenge cost explicitly:
+    - `C = sum_(i,j in E)(1 - x_i)(1 - x_j) + (sum_i x_i - 10)^2`
+  - uses the reduced QAOA study as a tractable subgraph carved from that same challenge graph
 
 This is split honestly across execution scales:
 
 - Full-scale planning stays classical so the entire hillside can be optimized.
-- The quantum study first shortlists the highest-impact cells and then runs on a smaller critical candidate subset derived from the same adjacency-based objective.
-- The final result compares the classical full-grid plan to a quantum-informed variant instead of pretending a full 100-qubit NISQ solve is currently practical.
+- The quantum study first shortlists the highest-impact cells and then runs on a smaller critical candidate subset derived from the same objective family.
+- The final result never pretends a full 100-qubit NISQ solve is currently practical.
+- Planning mode and challenge mode are stored and labeled separately so the compliance story is explicit.
 
 ## Forecast realism note
 

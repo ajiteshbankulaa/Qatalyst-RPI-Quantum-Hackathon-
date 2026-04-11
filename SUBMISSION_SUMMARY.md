@@ -20,13 +20,20 @@ The app is built as a real product workflow rather than disconnected challenge t
 
 - full 10x10 adjacency-based intervention planning
 - strict `K=10` intervention budget
-- full-scale deployable planning handled classically
-- reduced critical-subgraph study used for quantum optimization benchmarking
+- `planning` mode:
+  - full-scale deployable planning handled classically
+  - forecast-aware objective with recommendation safety gating
+- `challenge` mode:
+  - exact challenge-facing adjacency formulation
+  - challenge cost:
+    - `C = sum_(i,j in E)(1 - x_i)(1 - x_j) + (sum_i x_i - 10)^2`
+  - dry-brush adjacency graph on the 10x10 grid
+- reduced critical-subgraph study used for quantum optimization benchmarking and derived from the same graph family
 
 ### Risk modeling
 
 - task:
-  - classify whether a cell ignites within the early response window
+  - classify whether a cell belongs to the early ignition corridor within the planning response window
 - classical model:
   - scikit-learn logistic regression
 - quantum model:
@@ -86,5 +93,6 @@ This contribution is meaningful because it connects three challenge themes insid
 - real wildfire planning context
 - real classical-vs-QML comparison on the same task
 - real qBraid-centered benchmark study on a nontrivial quantum workload tied to the product itself
+- a direct wildfire challenge mode that judges can inspect independently from the richer planning mode
 
 The result is reproducible, technically grounded, and easy to judge from either the UI or the benchmark script.

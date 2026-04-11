@@ -69,9 +69,15 @@ def test_core_flow_endpoints():
     optimize = client.post("/api/optimize/run", json={"scenario_id": scenario_id})
     assert optimize.status_code == 200
     optimize_id = optimize.json()["id"]
+    assert optimize.json()["summary"]["mode"] == "planning"
     optimize_list = client.get(f"/api/optimize/runs?scenario_id={scenario_id}")
     assert optimize_list.status_code == 200
     assert any(item["id"] == optimize_id for item in optimize_list.json())
+
+    challenge_optimize = client.post("/api/optimize/run", json={"scenario_id": scenario_id, "mode": "challenge"})
+    assert challenge_optimize.status_code == 200
+    assert challenge_optimize.json()["summary"]["mode"] == "challenge"
+    assert "challenge_cost_after" in challenge_optimize.json()["summary"]
 
     benchmark = client.post(
         "/api/benchmarks/run",

@@ -3,11 +3,8 @@ import { Link, Outlet, useLocation } from "react-router";
 import {
   Atom,
   Cpu,
-  FileText,
   LayoutDashboard,
   Layers,
-  Plug,
-  Settings,
   Target,
   TrendingUp,
   AlertTriangle,
@@ -24,9 +21,6 @@ const navItems = [
   { path: "/app/forecast", label: "Spread Forecast", icon: TrendingUp },
   { path: "/app/optimize", label: "Intervention Plan", icon: Target },
   { path: "/app/benchmarks", label: "Benchmark Integrity", icon: Cpu },
-  { path: "/app/reports", label: "Reports", icon: FileText },
-  { path: "/app/integrations", label: "Integrations", icon: Plug },
-  { path: "/app/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppShell() {

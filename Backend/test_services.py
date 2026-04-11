@@ -13,6 +13,7 @@ sys.path.append(str(Path(__file__).resolve().parent))
 from app.models import Base, Scenario  # noqa: E402
 from app.services import benchmarks as benchmark_service  # noqa: E402
 from app.services import integrations as integration_service  # noqa: E402
+from app.services import optimize as optimize_service  # noqa: E402
 from app.services.forecast import create_forecast_run  # noqa: E402
 from app.services.optimize import candidate_rows, create_optimization_run  # noqa: E402
 from app.services.risk import _build_dataset, create_risk_run  # noqa: E402
@@ -111,28 +112,31 @@ def test_optimization_service_builds_real_or_labeled_quantum_scope(db_session: S
     run = create_optimization_run(
         db_session,
         scenario,
-        {"scenario_id": scenario.id, "intervention_budget_k": 10, "reduced_candidate_count": 12},
+        {"scenario_id": scenario.id, "mode": "planning", "intervention_budget_k": 10, "reduced_candidate_count": 12},
     )
     assert run.status == "complete"
-    assert run.summary_json["recommended_mode"] in {"classical_full_plan", "quantum_informed_plan"}
+    assert run.summary_json["recommended_mode"] in {"corridor_plan", "containment_plan", "quantum_informed_plan", "baseline_hold"}
     assert run.results_json["quantum"]["scope"]["type"] == "reduced_critical_subgraph"
-    assert run.results_json["recommended_plan"]["placements"]
+    assert run.summary_json["mode"] == "planning"
     assert run.summary_json["budget_enforced_k"] == 10
     assert len(run.results_json["classical"]["placements"]) == 10
-    assert len(run.results_json["recommended_plan"]["placements"]) == 10
     assert run.results_json["baseline"]["metrics"]["adjacency_links"] >= run.results_json["recommended_plan"]["metrics_after"]["adjacency_links"]
     assert run.summary_json["broken_adjacency_links"] >= 0
     assert run.results_json["quantum"]["scope"]["shortlist_count"] == 12
     assert run.results_json["quantum"]["scope"]["candidate_count"] <= 8
     assert "mean_final_burned_area" in run.results_json["baseline"]["metrics"]
     assert run.summary_json["expected_burned_area_reduction"] >= 0
+    assert run.summary_json["recommendation_status"] in {"recommended", "tradeoff", "no_clear_gain"}
+    assert "recommendation_reason" in run.summary_json
+    assert "comparison_playback" in run.results_json
+    assert run.results_json["comparison_playback"]["step_count"] >= 1
 
 
 def test_optimization_service_enforces_k10_cap(db_session: Session, scenario: Scenario):
     run = create_optimization_run(
         db_session,
         scenario,
-        {"scenario_id": scenario.id, "intervention_budget_k": 14, "reduced_candidate_count": 12},
+        {"scenario_id": scenario.id, "mode": "planning", "intervention_budget_k": 14, "reduced_candidate_count": 12},
     )
     assert run.summary_json["budget_enforced_k"] == 10
     assert run.request_json["intervention_budget_k"] == 10
@@ -142,7 +146,7 @@ def test_candidate_rows_are_adjacency_aligned(db_session: Session, scenario: Sce
     ranked = candidate_rows(scenario.grid)
     assert ranked
     top = ranked[0]
-    assert top["state"] in {"dry_brush", "ignition", "tree", "protected"}
+    assert top["state"] in {"dry_brush", "grass", "shrub", "tree", "protected"}
     assert "blocked_links" in top
     assert "component_contains_ignition" in top
 
@@ -151,13 +155,100 @@ def test_optimization_recommendations_include_explanations(db_session: Session, 
     run = create_optimization_run(
         db_session,
         scenario,
-        {"scenario_id": scenario.id, "intervention_budget_k": 10, "reduced_candidate_count": 12},
+        {"scenario_id": scenario.id, "mode": "planning", "intervention_budget_k": 10, "reduced_candidate_count": 12},
     )
-    placement = run.results_json["recommended_plan"]["placements"][0]
-    assert "reason" in placement
-    assert "expected_burned_area_reduction" in placement
-    assert "selected_by_quantum" in placement
+    if run.results_json["recommended_plan"]["placements"]:
+        placement = run.results_json["recommended_plan"]["placements"][0]
+        assert "reason" in placement
+        assert "expected_burned_area_reduction" in placement
+        assert "selected_by_quantum" in placement
+    assert run.summary_json["plan_explanation"]
     assert run.results_json["quantum"]["scope"]["shortlist_count"] >= run.results_json["quantum"]["scope"]["candidate_count"]
+
+
+def test_challenge_mode_outputs_exact_metrics(db_session: Session, scenario: Scenario):
+    run = create_optimization_run(
+        db_session,
+        scenario,
+        {"scenario_id": scenario.id, "mode": "challenge", "intervention_budget_k": 10, "reduced_candidate_count": 12},
+    )
+    assert run.summary_json["mode"] == "challenge"
+    assert run.summary_json["budget_enforced_k"] == 10
+    assert run.summary_json["K_used"] == 10
+    assert run.summary_json["challenge_cost_after"] <= run.summary_json["challenge_cost_before"]
+    assert run.summary_json["disrupted_edges"] >= 0
+    assert run.results_json["objective"]["name"] == "wildfire_challenge_cost"
+    assert run.results_json["quantum"]["scope"]["type"] == "reduced_challenge_subgraph"
+    assert run.results_json["comparison_playback"]["step_count"] >= 1
+
+
+def test_challenge_cost_prefers_covering_adjacent_dry_brush():
+    grid = [["empty" for _ in range(10)] for _ in range(10)]
+    grid[0][0] = "dry_brush"
+    grid[0][1] = "dry_brush"
+    grid[5][5] = "grass"
+    nodes, edges = optimize_service._challenge_graph(grid)
+    before = optimize_service._challenge_cost(nodes, edges, set(), 10)
+    after = optimize_service._challenge_cost(nodes, edges, {(0, 0)}, 10)
+    assert before["surviving_edges"] == 1
+    assert after["surviving_edges"] == 0
+
+
+def test_planning_recommendation_gates_unsafe_tradeoffs():
+    baseline_metrics = {"mean_final_burned_area": 10.0, "p90_final_burned_area": 14.0, "adjacency_links": 20, "peak_burn_probability": 0.55}
+    unsafe_candidate = {
+        "metrics_after": {"mean_final_burned_area": 11.0, "p90_final_burned_area": 15.0, "adjacency_links": 12, "peak_burn_probability": 0.5},
+        "objective_after": 30.0,
+    }
+    safe_candidate = {
+        "metrics_after": {"mean_final_burned_area": 9.1, "p90_final_burned_area": 13.5, "adjacency_links": 18, "peak_burn_probability": 0.54},
+        "objective_after": 35.0,
+    }
+    unsafe_status, _ = optimize_service._plan_acceptance(baseline_metrics, unsafe_candidate)
+    safe_status, _ = optimize_service._plan_acceptance(baseline_metrics, safe_candidate)
+    assert unsafe_status == "tradeoff"
+    assert safe_status == "recommended"
+
+
+def test_containment_plan_returns_valid_plan_and_playback(db_session: Session, scenario: Scenario):
+    run = create_optimization_run(
+        db_session,
+        scenario,
+        {"scenario_id": scenario.id, "mode": "planning", "intervention_budget_k": 10, "reduced_candidate_count": 12},
+    )
+    containment = run.results_json["containment_plan"]
+    assert containment["plan_type"] == "containment"
+    assert len(containment["placements"]) == 10
+    assert "explanation" in containment
+    comparison = run.results_json["plan_comparisons"]["containment"]
+    assert comparison["step_count"] >= 1
+    first_step = comparison["steps"][0]
+    assert "baseline" in first_step and "with_plan" in first_step and "difference" in first_step
+
+
+def test_playback_comparison_shapes_are_synchronized():
+    baseline = {
+        "representative_snapshots": [
+            {"step": 0, "grid": [["empty"]], "metrics": {}},
+            {"step": 1, "grid": [["ignition"]], "metrics": {}},
+        ],
+        "burn_probability_lookup": {"0-0": 0.8},
+        "expected_ignition_time_lookup": {"0-0": 1.0},
+        "summary": {"mean_final_burned_area": 5.0, "p90_final_burned_area": 6.0, "likely_spread_corridors": [{"row": 0, "col": 0}]},
+    }
+    with_plan = {
+        "representative_snapshots": [
+            {"step": 0, "grid": [["intervention"]], "metrics": {}},
+            {"step": 1, "grid": [["empty"]], "metrics": {}},
+        ],
+        "burn_probability_lookup": {"0-0": 0.2},
+        "expected_ignition_time_lookup": {"0-0": 3.0},
+        "summary": {"mean_final_burned_area": 2.0, "p90_final_burned_area": 3.0, "likely_spread_corridors": []},
+    }
+    comparison = optimize_service._build_playback_comparison(baseline, with_plan)
+    assert comparison["step_count"] == 2
+    assert comparison["difference_summary"]["delayed_ignition_cells"] >= 1
+    assert comparison["difference_summary"]["mean_burned_area_difference"] > 0
 
 
 def test_benchmark_service_degraded_mode_is_explicit(db_session: Session, scenario: Scenario, monkeypatch: pytest.MonkeyPatch):

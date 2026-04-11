@@ -57,7 +57,7 @@ export const api = {
   listForecastRuns: (scenarioId?: string) =>
     request<ForecastRun[]>(`/forecast/runs${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ""}`),
   getForecastRun: (id: string) => request<ForecastRun>(`/forecast/runs/${id}`),
-  runOptimize: (payload: { scenario_id: string; intervention_budget_k?: number; reduced_candidate_count?: number }) =>
+  runOptimize: (payload: { scenario_id: string; mode?: "planning" | "challenge"; intervention_budget_k?: number; reduced_candidate_count?: number }) =>
     request<OptimizationRun>("/optimize/run", { method: "POST", body: JSON.stringify(payload) }),
   listOptimizeRuns: (scenarioId?: string) =>
     request<OptimizationRun[]>(`/optimize/runs${scenarioId ? `?scenario_id=${encodeURIComponent(scenarioId)}` : ""}`),

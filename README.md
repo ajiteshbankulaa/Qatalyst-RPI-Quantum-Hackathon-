@@ -1,6 +1,6 @@
-# QuantumProj
+# QFire
 
-QuantumProj is a wildfire resilience planning and benchmarking application built around one operational workflow:
+QFire is a wildfire resilience planning and benchmarking application built around one operational workflow:
 
 `Scenario -> Risk Map -> Spread Forecast -> Intervention Plan -> Benchmark Integrity -> Report`
 
@@ -8,7 +8,7 @@ The current product wedge is concrete: a planner or resilience analyst defines a
 
 ## Which Challenges This Targets
 
-QuantumProj is structured to answer three hackathon tracks with one coherent product:
+QFire is structured to answer three hackathon tracks with one coherent product:
 
 - `Quantum Partitioning for Wildfire Resilience`
   - full-grid wildfire intervention planning on a 10x10 adjacency graph with strict `K=10`
@@ -95,10 +95,36 @@ The optimization engine maps directly onto the wildfire challenge framing:
 
 This is handled honestly at two scales:
 
-- full-scale deployable planning is classical on the complete 10x10 grid
-- reduced quantum study operates on a shortlisted critical subgraph derived from the same adjacency-driven objective
+- `planning` mode:
+  - full-scale deployable planning is classical on the complete 10x10 grid
+  - objective mixes adjacency disruption with forecast-aware burned-area outcomes
+  - recommendation safety gates prevent a worse-burned-area plan from being shown as the default recommendation
+- `challenge` mode:
+  - uses the posted challenge-facing adjacency formulation on the 10x10 grid
+  - strict `K=10`
+  - challenge cost:
+    - `C = sum_(i,j in E)(1 - x_i)(1 - x_j) + (sum_i x_i - 10)^2`
+  - graph edges come from dry-brush fire-path adjacency
+  - the reduced QAOA study is carved from the same challenge graph for tractable benchmarking
 
-The UI and summaries explicitly distinguish `classical full-grid planning` from the `reduced quantum-informed study`.
+The UI and summaries explicitly distinguish `planning mode` from `challenge mode`, and in both cases they distinguish the `full classical layer` from the `reduced quantum study`.
+
+### How This Satisfies The Wildfire Resilience Challenge
+
+QuantumProj now answers the wildfire challenge in a direct, defendable way:
+
+- the challenge-facing optimizer works on a `10x10` grid
+- it enforces `K = 10` placements
+- it builds a fire-path graph from adjacency among challenge flammable cells
+- it exposes the challenge cost function explicitly
+- it keeps a reduced QAOA study derived from the same graph
+- it does not pretend a full 100-qubit hardware solve is currently practical
+
+This means the repo can show:
+
+- an exact challenge-facing formulation for judges
+- a richer planning mode for product usefulness
+- one honest bridge between the full wildfire graph and the reduced benchmarked quantum subproblem
 
 ### Classical ML vs Quantum ML Risk Modeling
 
@@ -205,11 +231,11 @@ The current repo is intentionally honest:
 
 Important files:
 
-- [AppShell.tsx](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Frontend/src/app/components/AppShell.tsx)
-- [RiskPage.tsx](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Frontend/src/app/pages/RiskPage.tsx)
-- [OptimizePage.tsx](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Frontend/src/app/pages/OptimizePage.tsx)
-- [BenchmarksPage.tsx](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Frontend/src/app/pages/BenchmarksPage.tsx)
-- [BenchmarkDetailPage.tsx](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Frontend/src/app/pages/BenchmarkDetailPage.tsx)
+- [AppShell.tsx](Frontend/src/app/components/AppShell.tsx)
+- [RiskPage.tsx](Frontend/src/app/pages/RiskPage.tsx)
+- [OptimizePage.tsx](Frontend/src/app/pages/OptimizePage.tsx)
+- [BenchmarksPage.tsx](Frontend/src/app/pages/BenchmarksPage.tsx)
+- [BenchmarkDetailPage.tsx](Frontend/src/app/pages/BenchmarkDetailPage.tsx)
 
 ### Backend
 
@@ -221,12 +247,12 @@ Important files:
 
 Important files:
 
-- [main.py](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/app/main.py)
-- [risk.py](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/app/services/risk.py)
-- [forecast.py](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/app/services/forecast.py)
-- [optimize.py](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/app/services/optimize.py)
-- [benchmarks.py](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/app/services/benchmarks.py)
-- [qaoa.py](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/app/algorithms/qaoa.py)
+- [main.py](Backend/app/main.py)
+- [risk.py](Backend/app/services/risk.py)
+- [forecast.py](Backend/app/services/forecast.py)
+- [optimize.py](Backend/app/services/optimize.py)
+- [benchmarks.py](Backend/app/services/benchmarks.py)
+- [qaoa.py](Backend/app/algorithms/qaoa.py)
 
 ### How the Modules Connect
 
@@ -239,7 +265,7 @@ Important files:
 
 ### Where qBraid and IBM Are Used
 
-- qBraid is central in [benchmarks.py](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/app/services/benchmarks.py) as the compile/transpile backbone
+- qBraid is central in [benchmarks.py](Backend/app/services/benchmarks.py) as the compile/transpile backbone
 - IBM Runtime is used in the benchmark hardware path through `SamplerV2` when credentials and backend availability allow it
 - if IBM is unavailable, the benchmark degrades cleanly to simulator execution without fabricating hardware data
 
@@ -267,7 +293,7 @@ npm.cmd install
 
 ## Environment Variables
 
-Backend variables are defined in [Backend/.env.example](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/.env.example):
+Backend variables are defined in [Backend/.env.example](Backend/.env.example):
 
 - `QUANTUMPROJ_DB_PATH`
 - `QBRAID_API_KEY`
@@ -371,6 +397,6 @@ Coverage focus:
 
 ## Repo Notes
 
-- [Backend/README.md](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Backend/README.md) contains backend-specific architecture and runtime notes
-- [Frontend/README.md](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/Frontend/README.md) contains frontend-specific launch notes
-- [SUBMISSION_SUMMARY.md](/c:/Users/ajite/OneDrive/Desktop/QuantumProject!/SUBMISSION_SUMMARY.md) contains a short judge-facing summary
+- [Backend/README.md](Backend/README.md) contains backend-specific architecture and runtime notes
+- [Frontend/README.md](Frontend/README.md) contains frontend-specific launch notes
+- [SUBMISSION_SUMMARY.md](SUBMISSION_SUMMARY.md) contains a short judge-facing summary

@@ -13,7 +13,7 @@ const stateStyles: Record<CellState, string> = {
   tree: "bg-[#4d7c0f] border-[#3f6212]",
   water: "bg-[#0ea5e9] border-[#0284c7]",
   protected: "bg-[#818cf8] border-[#6366f1]",
-  intervention: "bg-[#f97316] border-[#ea580c]",
+  intervention: "bg-[#ffedd5] border-[#ea580c]",
   ignition: "bg-[#ef4444] border-[#dc2626]",
   burned: "bg-[#18181b] border-[#09090b]",
 };
@@ -219,6 +219,8 @@ export function ScenarioGrid({
   editable = false,
   brushState,
   scoreLookup,
+  interventionLookup,
+  differenceLookup,
 }: {
   grid: CellState[][];
   selected?: [number, number] | null;
@@ -226,6 +228,8 @@ export function ScenarioGrid({
   editable?: boolean;
   brushState?: CellState;
   scoreLookup?: Record<string, number>;
+  interventionLookup?: Record<string, boolean>;
+  differenceLookup?: Record<string, "protected" | "changed">;
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -233,6 +237,8 @@ export function ScenarioGrid({
         {grid.map((row, rowIndex) =>
           row.map((cell, colIndex) => {
             const score = scoreLookup?.[`${rowIndex}-${colIndex}`];
+            const interventionMarked = cell === "intervention" || Boolean(interventionLookup?.[`${rowIndex}-${colIndex}`]);
+            const difference = differenceLookup?.[`${rowIndex}-${colIndex}`];
             const isSelected = selected?.[0] === rowIndex && selected?.[1] === colIndex;
             return (
               <button
@@ -247,6 +253,20 @@ export function ScenarioGrid({
                 )}
                 title={`${rowIndex},${colIndex} - ${stateLabels[cell]}${brushState && editable ? ` -> ${stateLabels[brushState]}` : ""}`}
               >
+                {interventionMarked ? (
+                  <>
+                    <div className="absolute inset-[2px] border-2 border-[#c2410c] bg-[repeating-linear-gradient(135deg,rgba(249,115,22,0.18),rgba(249,115,22,0.18)_4px,transparent_4px,transparent_8px)]" />
+                    <div className="absolute inset-0 flex items-center justify-center text-[9px] font-black uppercase tracking-[0.18em] text-[#9a3412]">T</div>
+                  </>
+                ) : null}
+                {difference ? (
+                  <div
+                    className={cx(
+                      "absolute inset-[1px] border-2",
+                      difference === "protected" ? "border-cyan-300 bg-cyan-400/10" : "border-white/70 bg-white/10",
+                    )}
+                  />
+                ) : null}
                 {typeof score === "number" ? (
                   <div className="absolute inset-x-0 bottom-0 bg-black/60 p-0.5 text-center text-[10px] font-bold tracking-wider text-white backdrop-blur-sm">
                     {(score * 100).toFixed(0)}
@@ -260,7 +280,9 @@ export function ScenarioGrid({
       <div className="mt-6 flex flex-wrap gap-x-4 gap-y-2">
         {(Object.entries(stateStyles) as [CellState, string][]).map(([state, cls]) => (
           <div key={state} className="flex items-center gap-2">
-            <div className={cx("h-3 w-3 border", cls)} />
+            <div className={cx("relative h-3 w-3 border", cls)}>
+              {state === "intervention" ? <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,rgba(249,115,22,0.5),rgba(249,115,22,0.5)_2px,transparent_2px,transparent_4px)]" /> : null}
+            </div>
             <span className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">{stateLabels[state]}</span>
           </div>
         ))}

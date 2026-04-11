@@ -47,7 +47,7 @@ CELL_LIBRARY: dict[str, CellSemantics] = {
     "shrub": CellSemantics("shrub", 0.64, 0.62, 2, 0.1, 0.0, 0.74, True),
     "tree": CellSemantics("tree", 0.54, 0.8, 3, 0.2, 0.0, 0.66, True),
     "protected": CellSemantics("protected", 0.21, 0.18, 1, 0.03, 0.55, 0.22, True),
-    "intervention": CellSemantics("intervention", 0.12, 0.12, 1, 0.02, 0.75, 0.14, True),
+    "intervention": CellSemantics("intervention", 0.0, 0.0, 0, 0.0, 1.0, 0.0, False, True),
     "ignition": CellSemantics("ignition", 1.0, 1.0, 3, 0.18, 0.0, 1.0, True),
     "burned": CellSemantics("burned", 0.0, 0.0, 0, 0.0, 1.0, 0.0, False),
 }
